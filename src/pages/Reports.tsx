@@ -96,7 +96,7 @@ export default function Reports() {
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 89%)" />
               <XAxis dataKey="day" tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 10 }} />
-              <Tooltip formatter={(value: number) => formatCurrency(value)} />
+              <Tooltip formatter={(value: unknown) => formatCurrency(Number(value))} />
               <Legend />
               <Line type="monotone" dataKey="credit" stroke="hsl(0, 72%, 51%)" strokeWidth={2} name="Credit" dot={false} />
               <Line type="monotone" dataKey="payment" stroke="hsl(142, 71%, 40%)" strokeWidth={2} name="Payment" dot={false} />
