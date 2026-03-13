@@ -115,7 +115,7 @@ export default function Reports() {
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 89%)" />
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                <Tooltip formatter={(value: unknown) => formatCurrency(Number(value))} />
                 <Bar dataKey="credit" fill="hsl(0, 72%, 51%)" name="Credit" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="payment" fill="hsl(142, 71%, 40%)" name="Payments" radius={[4, 4, 0, 0]} />
               </BarChart>
