@@ -5,6 +5,24 @@ export interface Customer {
   address: string;
   notes: string;
   isActive: boolean;
+  creditLimit: number;
+  cnic: string;
+  email: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Product {
+  id: string;
+  name: string;
+  category: string;
+  sku: string;
+  price: number;
+  costPrice: number;
+  stock: number;
+  unit: string;
+  minStock: number;
+  isActive: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -16,6 +34,8 @@ export interface Transaction {
   amount: number;
   description: string;
   date: string;
+  productId?: string;
+  quantity?: number;
   createdAt: string;
 }
 
@@ -27,6 +47,10 @@ export interface Settings {
   phone: string;
   address: string;
   autoBackup: boolean;
+  darkMode: boolean;
+  language: string;
+  taxRate: number;
+  receiptFooter: string;
 }
 
 export interface DashboardStats {
@@ -36,4 +60,8 @@ export interface DashboardStats {
   totalPayments: number;
   outstandingBalance: number;
   recentTransactions: Transaction[];
+  todayCredit: number;
+  todayPayments: number;
+  weekCredit: number;
+  weekPayments: number;
 }
