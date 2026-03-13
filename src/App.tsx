@@ -10,6 +10,7 @@ import Products from "./pages/Products";
 import Reports from "./pages/Reports";
 import SettingsPage from "./pages/Settings";
 import SaleReceipt from "./pages/SaleReceipt";
+import DailyClose from "./pages/DailyClose";
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="/products" element={<Products />} />
           <Route path="/sale" element={<SaleReceipt />} />
           <Route path="/reports" element={<Reports />} />
+          <Route path="/daily-close" element={<DailyClose />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Routes>

@@ -1,5 +1,5 @@
 import Dexie, { type Table } from "dexie";
-import type { Customer, Transaction, Settings, Product } from "@/types";
+import type { Customer, Transaction, Settings, Product, DailySummary } from "@/types";
 
 class ShopDatabase extends Dexie {
   customers!: Table<Customer, string>;
@@ -58,7 +58,6 @@ export async function deleteCustomer(id: string): Promise<void> {
   });
 }
 
-// FIX: Use in-memory filter instead of Dexie boolean index (Dexie booleans can be inconsistent)
 export async function getCustomers(activeOnly = false): Promise<Customer[]> {
   const all = await db.customers.toArray();
   if (activeOnly) return all.filter(c => c.isActive === true);
@@ -69,9 +68,14 @@ export async function getCustomer(id: string): Promise<Customer | undefined> {
   return db.customers.get(id);
 }
 
+// Only credit/payment affect customer balance — "sale" (cash) does not
 export async function getCustomerBalance(customerId: string): Promise<number> {
   const txns = await db.transactions.where("customerId").equals(customerId).toArray();
-  return txns.reduce((bal, t) => bal + (t.type === "credit" ? t.amount : -t.amount), 0);
+  return txns.reduce((bal, t) => {
+    if (t.type === "credit") return bal + t.amount;
+    if (t.type === "payment") return bal - t.amount;
+    return bal; // "sale" type doesn't affect balance
+  }, 0);
 }
 
 export async function addProduct(product: Omit<Product, "id" | "createdAt" | "updatedAt">): Promise<Product> {
@@ -89,7 +93,6 @@ export async function deleteProduct(id: string): Promise<void> {
   await db.products.delete(id);
 }
 
-// FIX: Use in-memory filter instead of Dexie boolean index
 export async function getProducts(activeOnly = false): Promise<Product[]> {
   const all = await db.products.toArray();
   if (activeOnly) return all.filter(p => p.isActive === true);
@@ -103,13 +106,17 @@ export async function getProduct(id: string): Promise<Product | undefined> {
 export async function updateProductStock(id: string, quantityChange: number): Promise<void> {
   const product = await db.products.get(id);
   if (product) {
-    await db.products.update(id, { stock: Math.max(0, product.stock + quantityChange), updatedAt: new Date().toISOString() });
+    await db.products.update(id, {
+      stock: Math.max(0, product.stock + quantityChange),
+      updatedAt: new Date().toISOString(),
+    });
   }
 }
 
 export async function addTransaction(txn: Omit<Transaction, "id" | "createdAt">): Promise<Transaction> {
   const newTxn: Transaction = { ...txn, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
   await db.transactions.put(newTxn);
+  // Only auto-update stock for single-product credit transactions
   if (txn.productId && txn.quantity && txn.type === "credit") {
     await updateProductStock(txn.productId, -txn.quantity);
   }
@@ -119,6 +126,7 @@ export async function addTransaction(txn: Omit<Transaction, "id" | "createdAt">)
 export async function deleteTransaction(id: string): Promise<void> {
   const txn = await db.transactions.get(id);
   if (txn) {
+    // Only reverse stock for single-product credit transactions
     if (txn.productId && txn.quantity && txn.type === "credit") {
       await updateProductStock(txn.productId, txn.quantity);
     }
@@ -138,8 +146,11 @@ export async function getDashboardStats() {
   const transactions = await db.transactions.toArray();
   const products = await db.products.toArray();
 
-  const totalCredit = transactions.filter(t => t.type === "credit").reduce((s, t) => s + t.amount, 0);
-  const totalPayments = transactions.filter(t => t.type === "payment").reduce((s, t) => s + t.amount, 0);
+  const creditTxns = transactions.filter(t => t.type === "credit");
+  const paymentTxns = transactions.filter(t => t.type === "payment");
+
+  const totalCredit = creditTxns.reduce((s, t) => s + t.amount, 0);
+  const totalPayments = paymentTxns.reduce((s, t) => s + t.amount, 0);
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate() - 7);
@@ -156,9 +167,33 @@ export async function getDashboardStats() {
     outstandingBalance: totalCredit - totalPayments,
     todayCredit: todayTxns.filter(t => t.type === "credit").reduce((s, t) => s + t.amount, 0),
     todayPayments: todayTxns.filter(t => t.type === "payment").reduce((s, t) => s + t.amount, 0),
+    todayCashSales: todayTxns.filter(t => t.type === "sale").reduce((s, t) => s + t.amount, 0),
     weekCredit: weekTxns.filter(t => t.type === "credit").reduce((s, t) => s + t.amount, 0),
     weekPayments: weekTxns.filter(t => t.type === "payment").reduce((s, t) => s + t.amount, 0),
     lowStockProducts,
+  };
+}
+
+export async function getDailySummary(dateStr: string): Promise<DailySummary> {
+  const dayStart = new Date(dateStr);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(dateStr);
+  dayEnd.setHours(23, 59, 59, 999);
+
+  const allTxns = await db.transactions.toArray();
+  const dayTxns = allTxns.filter(t => {
+    const d = new Date(t.date);
+    return d >= dayStart && d <= dayEnd;
+  });
+
+  return {
+    date: dateStr,
+    cashSales: dayTxns.filter(t => t.type === "sale").reduce((s, t) => s + t.amount, 0),
+    creditGiven: dayTxns.filter(t => t.type === "credit").reduce((s, t) => s + t.amount, 0),
+    paymentsReceived: dayTxns.filter(t => t.type === "payment").reduce((s, t) => s + t.amount, 0),
+    salesCount: dayTxns.filter(t => t.type === "sale").length,
+    creditCount: dayTxns.filter(t => t.type === "credit").length,
+    paymentCount: dayTxns.filter(t => t.type === "payment").length,
   };
 }
 

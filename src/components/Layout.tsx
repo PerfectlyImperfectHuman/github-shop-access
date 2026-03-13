@@ -1,7 +1,7 @@
 import { Outlet, NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Users, PlusCircle, History, BarChart3, Settings,
-  Store, Menu, X, Package, Moon, Sun, ShoppingCart,
+  Store, Menu, X, Package, Moon, Sun, ShoppingCart, ClipboardCheck,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,7 @@ const navItems = [
   { to: "/sale", icon: ShoppingCart, label: "POS / Sale" },
   { to: "/transactions", icon: History, label: "History" },
   { to: "/reports", icon: BarChart3, label: "Reports" },
+  { to: "/daily-close", icon: ClipboardCheck, label: "Daily Close" },
   { to: "/settings", icon: Settings, label: "Settings" },
 ];
 
@@ -24,7 +25,7 @@ const mobileBottomNav = [
   { to: "/customers", icon: Users, label: "Customers" },
   { to: "/new-transaction", icon: PlusCircle, label: "New Entry", primary: true },
   { to: "/sale", icon: ShoppingCart, label: "POS" },
-  { to: "/transactions", icon: History, label: "History" },
+  { to: "/daily-close", icon: ClipboardCheck, label: "Close" },
 ];
 
 export default function Layout() {
@@ -181,7 +182,7 @@ export default function Layout() {
                   )
                 }
               >
-                <item.icon className={cn("shrink-0", item.primary ? "w-5 h-5" : "w-5 h-5")} />
+                <item.icon className="w-5 h-5 shrink-0" />
                 <span className="truncate">{item.label}</span>
               </NavLink>
             ))}

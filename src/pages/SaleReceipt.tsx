@@ -7,6 +7,7 @@
  * • Cash received → change calculator
  * • Print thermal-style receipt
  * • Updates product stock in DB
+ * • Cash sales are recorded as type "sale" for daily close reporting
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -64,12 +65,12 @@ export default function SaleReceipt() {
     load();
   }, []);
 
-  // ─── Totals ──────────────────────────────────────────────────────────────
+  // ─── Totals ───────────────────────────────────────────────────────────────
   const subtotal = cart.reduce((s, i) => s + i.qty * i.unitPrice, 0);
   const cash = parseFloat(cashReceived) || 0;
   const change = cash - subtotal;
 
-  // ─── Cart helpers ─────────────────────────────────────────────────────────
+  // ─── Cart helpers ──────────────────────────────────────────────────────────
   function addToCart(product: Product) {
     setCart((prev) => {
       const idx = prev.findIndex((i) => i.product.id === product.id);
@@ -94,7 +95,7 @@ export default function SaleReceipt() {
       addToCart(product);
       toast.success(`Added: ${product.name}`);
     } else {
-      toast.error(`No product found for barcode: ${code}`);
+      toast.error(`No product for barcode "${code}". Add it from the Products page.`);
     }
     setShowScanner(false);
   }
@@ -115,7 +116,7 @@ export default function SaleReceipt() {
     setCart((prev) => prev.filter((i) => i.product.id !== id));
   }
 
-  // ─── Save sale ────────────────────────────────────────────────────────────
+  // ─── Save sale ─────────────────────────────────────────────────────────────
   async function handleSave() {
     if (cart.length === 0) { toast.error("Cart is empty"); return; }
     if (saleMode === "credit" && !selectedCustomer) {
@@ -125,7 +126,7 @@ export default function SaleReceipt() {
     setSaving(true);
     try {
       const itemsSummary = cart
-        .map((i) => `${i.product.name} x${i.qty} @ ${formatCurrency(i.unitPrice)}`)
+        .map((i) => `${i.product.name} ×${i.qty}`)
         .join(", ");
 
       if (saleMode === "credit" && selectedCustomer) {
@@ -136,14 +137,20 @@ export default function SaleReceipt() {
           amount: subtotal,
           description: `Sale: ${itemsSummary}`,
           date: new Date().toISOString(),
-          productId: cart.length === 1 ? cart[0].product.id : undefined,
+        });
+      } else if (saleMode === "cash") {
+        // Record cash sale for daily reporting
+        await addTransaction({
+          customerId: selectedCustomer?.id || "",
+          type: "sale",
+          amount: subtotal,
+          description: `Cash Sale: ${itemsSummary}`,
+          date: new Date().toISOString(),
         });
       }
 
       // Update stock for all items
-      await Promise.all(
-        cart.map((i) => updateProductStock(i.product.id, -i.qty))
-      );
+      await Promise.all(cart.map((i) => updateProductStock(i.product.id, -i.qty)));
 
       setSaved(true);
       setReceiptVisible(true);
@@ -156,10 +163,7 @@ export default function SaleReceipt() {
     }
   }
 
-  // ─── Print ────────────────────────────────────────────────────────────────
-  function handlePrint() {
-    window.print();
-  }
+  function handlePrint() { window.print(); }
 
   function startNewSale() {
     setCart([]);
@@ -191,7 +195,7 @@ export default function SaleReceipt() {
 
   return (
     <>
-      {/* ── Print-only receipt (hidden on screen, printed on Ctrl+P) ── */}
+      {/* ── Print-only receipt ── */}
       <div ref={receiptRef} className="receipt-print-area hidden print:block">
         <div style={{ fontFamily: "monospace", fontSize: "12px", width: "80mm", margin: "0 auto", padding: "4mm" }}>
           <div style={{ textAlign: "center", marginBottom: "8px" }}>
@@ -279,18 +283,17 @@ export default function SaleReceipt() {
                       <> · Change: <span className="font-semibold text-success">{formatCurrency(change)}</span></>
                     )}
                   </p>
+                  {saleMode === "cash" && (
+                    <p className="text-xs text-muted-foreground mt-1">Recorded as cash sale</p>
+                  )}
                 </div>
                 <div className="flex gap-2">
-                  <button
-                    onClick={handlePrint}
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium text-sm hover:opacity-90 transition"
-                  >
+                  <button onClick={handlePrint}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium text-sm hover:opacity-90 transition">
                     <Printer className="w-4 h-4" /> Print
                   </button>
-                  <button
-                    onClick={startNewSale}
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-secondary text-secondary-foreground rounded-xl font-medium text-sm hover:opacity-90 transition"
-                  >
+                  <button onClick={startNewSale}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-secondary text-secondary-foreground rounded-xl font-medium text-sm hover:opacity-90 transition">
                     <RefreshCw className="w-4 h-4" /> New Sale
                   </button>
                 </div>
@@ -315,33 +318,28 @@ export default function SaleReceipt() {
                 <button onClick={() => setShowCustomerPicker(false)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground"><X className="w-4 h-4" /></button>
               </div>
               <div className="p-3 border-b border-border">
-                <input
-                  autoFocus
-                  type="text"
-                  placeholder="Search name or phone..."
-                  value={customerSearch}
-                  onChange={(e) => setCustomerSearch(e.target.value)}
+                <input autoFocus type="text" placeholder="Search name or phone..."
+                  value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </div>
               <div className="max-h-64 overflow-y-auto">
-                {filteredCustomers.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">No customers found</p>
-                ) : filteredCustomers.map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => { setSelectedCustomer(c); setShowCustomerPicker(false); setCustomerSearch(""); }}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted text-left transition"
-                  >
-                    <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold shrink-0">
-                      {c.name.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-card-foreground">{c.name}</p>
-                      {c.phone && <p className="text-xs text-muted-foreground">{c.phone}</p>}
-                    </div>
-                  </button>
-                ))}
+                {filteredCustomers.length === 0
+                  ? <p className="text-sm text-muted-foreground text-center py-8">No customers found</p>
+                  : filteredCustomers.map((c) => (
+                    <button key={c.id}
+                      onClick={() => { setSelectedCustomer(c); setShowCustomerPicker(false); setCustomerSearch(""); }}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted text-left transition">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold shrink-0">
+                        {c.name.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-card-foreground">{c.name}</p>
+                        {c.phone && <p className="text-xs text-muted-foreground">{c.phone}</p>}
+                      </div>
+                    </button>
+                  ))
+                }
               </div>
             </div>
           </div>
@@ -362,17 +360,13 @@ export default function SaleReceipt() {
 
         {/* ── Add items toolbar ── */}
         <div className="flex gap-2">
-          <button
-            onClick={() => setShowScanner(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:opacity-90 transition"
-          >
+          <button onClick={() => setShowScanner(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:opacity-90 transition">
             <Scan className="w-4 h-4" /> Scan
           </button>
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search products..."
+            <input type="text" placeholder="Search products..."
               value={search}
               onChange={(e) => { setSearch(e.target.value); setShowSearch(true); }}
               onFocus={() => setShowSearch(true)}
@@ -380,24 +374,22 @@ export default function SaleReceipt() {
             />
             {showSearch && search && (
               <div className="absolute top-full mt-1 left-0 right-0 z-30 bg-card border border-border rounded-xl shadow-xl max-h-60 overflow-y-auto">
-                {filteredProducts.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">No products found</p>
-                ) : filteredProducts.slice(0, 10).map((p) => (
-                  <button
-                    key={p.id}
-                    onMouseDown={() => addToCart(p)}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted text-left transition"
-                  >
-                    <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-sm font-bold shrink-0">
-                      {p.name.charAt(0)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-card-foreground truncate">{p.name}</p>
-                      <p className="text-xs text-muted-foreground">{formatCurrency(p.price)}/{p.unit} · {p.stock} in stock{p.sku ? ` · #${p.sku}` : ""}</p>
-                    </div>
-                    <Plus className="w-4 h-4 text-primary shrink-0" />
-                  </button>
-                ))}
+                {filteredProducts.length === 0
+                  ? <p className="text-sm text-muted-foreground text-center py-4">No products found</p>
+                  : filteredProducts.slice(0, 10).map((p) => (
+                    <button key={p.id} onMouseDown={() => addToCart(p)}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted text-left transition">
+                      <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-sm font-bold shrink-0">
+                        {p.name.charAt(0)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-card-foreground truncate">{p.name}</p>
+                        <p className="text-xs text-muted-foreground">{formatCurrency(p.price)}/{p.unit} · {p.stock} in stock{p.sku ? ` · #${p.sku}` : ""}</p>
+                      </div>
+                      <Plus className="w-4 h-4 text-primary shrink-0" />
+                    </button>
+                  ))
+                }
               </div>
             )}
           </div>
@@ -430,9 +422,7 @@ export default function SaleReceipt() {
                     <p className="text-sm font-medium text-card-foreground truncate">{item.product.name}</p>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-xs text-muted-foreground">Rs.</span>
-                      <input
-                        type="number"
-                        value={item.unitPrice}
+                      <input type="number" value={item.unitPrice}
                         onChange={(e) => updatePrice(item.product.id, Number(e.target.value))}
                         className="w-20 text-xs font-mono text-card-foreground bg-transparent border-b border-dashed border-border focus:outline-none focus:border-primary"
                       />
@@ -456,7 +446,6 @@ export default function SaleReceipt() {
                   </button>
                 </div>
               ))}
-              {/* Total row */}
               <div className="flex items-center justify-between px-4 py-3 bg-muted/30">
                 <span className="font-display font-bold text-sm text-card-foreground">Total</span>
                 <span className="font-display font-bold text-lg text-primary font-mono">{formatCurrency(subtotal)}</span>
@@ -474,16 +463,12 @@ export default function SaleReceipt() {
             <div className="p-4 space-y-4">
               {/* Sale mode toggle */}
               <div className="flex rounded-lg border border-border overflow-hidden">
-                <button
-                  onClick={() => setSaleMode("cash")}
-                  className={`flex-1 py-2.5 text-sm font-medium transition ${saleMode === "cash" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}
-                >
+                <button onClick={() => setSaleMode("cash")}
+                  className={`flex-1 py-2.5 text-sm font-medium transition ${saleMode === "cash" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}>
                   💵 Cash Sale
                 </button>
-                <button
-                  onClick={() => setSaleMode("credit")}
-                  className={`flex-1 py-2.5 text-sm font-medium transition ${saleMode === "credit" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}
-                >
+                <button onClick={() => setSaleMode("credit")}
+                  className={`flex-1 py-2.5 text-sm font-medium transition ${saleMode === "credit" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}>
                   📋 Udhar (Credit)
                 </button>
               </div>
@@ -492,10 +477,7 @@ export default function SaleReceipt() {
               {saleMode === "cash" && (
                 <div>
                   <label className="text-xs font-medium text-muted-foreground mb-1 block">Cash Received (Rs.)</label>
-                  <input
-                    type="number"
-                    value={cashReceived}
-                    onChange={(e) => setCashReceived(e.target.value)}
+                  <input type="number" value={cashReceived} onChange={(e) => setCashReceived(e.target.value)}
                     placeholder={subtotal.toString()}
                     className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-lg font-mono font-bold focus:outline-none focus:ring-2 focus:ring-ring"
                   />
@@ -507,11 +489,16 @@ export default function SaleReceipt() {
                   )}
                   {/* Quick cash buttons */}
                   <div className="flex gap-2 mt-2 flex-wrap">
-                    {[Math.ceil(subtotal / 100) * 100, Math.ceil(subtotal / 500) * 500, Math.ceil(subtotal / 1000) * 1000].filter((v, i, arr) => arr.indexOf(v) === i && v >= subtotal).slice(0, 4).map((amt) => (
-                      <button key={amt} onClick={() => setCashReceived(String(amt))} className="text-xs px-3 py-1.5 rounded-lg bg-muted text-muted-foreground hover:bg-primary hover:text-primary-foreground transition font-mono">
-                        {amt.toLocaleString()}
-                      </button>
-                    ))}
+                    {[Math.ceil(subtotal / 100) * 100, Math.ceil(subtotal / 500) * 500, Math.ceil(subtotal / 1000) * 1000]
+                      .filter((v, i, arr) => arr.indexOf(v) === i && v >= subtotal)
+                      .slice(0, 4)
+                      .map((amt) => (
+                        <button key={amt} onClick={() => setCashReceived(String(amt))}
+                          className="text-xs px-3 py-1.5 rounded-lg bg-muted text-muted-foreground hover:bg-primary hover:text-primary-foreground transition font-mono">
+                          {amt.toLocaleString()}
+                        </button>
+                      ))
+                    }
                   </div>
                 </div>
               )}
@@ -521,24 +508,19 @@ export default function SaleReceipt() {
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">
                   {saleMode === "credit" ? "Customer (required)" : "Customer (optional)"}
                 </label>
-                <button
-                  onClick={() => setShowCustomerPicker(true)}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg border border-input bg-background text-sm text-left hover:border-ring/50 transition"
-                >
+                <button onClick={() => setShowCustomerPicker(true)}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg border border-input bg-background text-sm text-left hover:border-ring/50 transition">
                   <UserCircle className="w-4 h-4 text-muted-foreground shrink-0" />
                   <span className={selectedCustomer ? "text-foreground font-medium" : "text-muted-foreground"}>
                     {selectedCustomer ? selectedCustomer.name : "Select customer..."}
                   </span>
-                  {selectedCustomer ? (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setSelectedCustomer(null); }}
-                      className="ml-auto p-0.5 hover:text-destructive text-muted-foreground"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  ) : (
-                    <ChevronDown className="w-4 h-4 text-muted-foreground ml-auto" />
-                  )}
+                  {selectedCustomer
+                    ? <button onClick={(e) => { e.stopPropagation(); setSelectedCustomer(null); }}
+                        className="ml-auto p-0.5 hover:text-destructive text-muted-foreground">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    : <ChevronDown className="w-4 h-4 text-muted-foreground ml-auto" />
+                  }
                 </button>
               </div>
             </div>
@@ -548,24 +530,19 @@ export default function SaleReceipt() {
         {/* ── Action buttons ── */}
         {cart.length > 0 && (
           <div className="flex gap-3 pb-24 md:pb-4">
-            <button
-              onClick={handleSave}
+            <button onClick={handleSave}
               disabled={saving || saved || (saleMode === "credit" && !selectedCustomer)}
-              className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-primary text-primary-foreground rounded-xl font-semibold text-sm hover:opacity-90 transition disabled:opacity-50"
-            >
-              {saving ? (
-                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : saved ? (
-                <><Check className="w-4 h-4" /> Saved!</>
-              ) : (
-                <><Check className="w-4 h-4" /> Save Sale · {formatCurrency(subtotal)}</>
-              )}
+              className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-primary text-primary-foreground rounded-xl font-semibold text-sm hover:opacity-90 transition disabled:opacity-50">
+              {saving
+                ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                : saved
+                  ? <><Check className="w-4 h-4" /> Saved!</>
+                  : <><Check className="w-4 h-4" /> Save Sale · {formatCurrency(subtotal)}</>
+              }
             </button>
             {saved && (
-              <button
-                onClick={handlePrint}
-                className="flex items-center gap-2 px-5 py-3.5 bg-secondary text-secondary-foreground rounded-xl font-medium text-sm hover:opacity-90 transition"
-              >
+              <button onClick={handlePrint}
+                className="flex items-center gap-2 px-5 py-3.5 bg-secondary text-secondary-foreground rounded-xl font-medium text-sm hover:opacity-90 transition">
                 <Printer className="w-4 h-4" /> Print
               </button>
             )}

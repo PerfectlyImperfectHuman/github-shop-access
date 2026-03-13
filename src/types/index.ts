@@ -29,8 +29,8 @@ export interface Product {
 
 export interface Transaction {
   id: string;
-  customerId: string;
-  type: "credit" | "payment";
+  customerId: string;        // empty string "" for cash sales (type === "sale")
+  type: "credit" | "payment" | "sale";
   amount: number;
   description: string;
   date: string;
@@ -62,6 +62,17 @@ export interface DashboardStats {
   recentTransactions: Transaction[];
   todayCredit: number;
   todayPayments: number;
+  todayCashSales: number;
   weekCredit: number;
   weekPayments: number;
+}
+
+export interface DailySummary {
+  date: string;
+  cashSales: number;
+  creditGiven: number;
+  paymentsReceived: number;
+  salesCount: number;
+  creditCount: number;
+  paymentCount: number;
 }

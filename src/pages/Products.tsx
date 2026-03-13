@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Search, Package, Edit2, Trash2, AlertTriangle, ToggleLeft, ToggleRight, X } from "lucide-react";
+import { Plus, Search, Package, Edit2, Trash2, AlertTriangle, ToggleLeft, ToggleRight, X, Scan } from "lucide-react";
 import { getProducts, addProduct, updateProduct, deleteProduct } from "@/lib/db";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import { SelectField } from "@/components/ui/select-field";
+import { BarcodeScanner } from "@/components/BarcodeScanner";
 import type { Product } from "@/types";
 
 const CATEGORIES = ["General", "Grocery", "Electronics", "Clothing", "Hardware", "Medicine", "Stationery", "Other"];
@@ -23,6 +24,7 @@ export default function Products() {
   const [filterCategory, setFilterCategory] = useState("");
   const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(true);
+  const [showScanner, setShowScanner] = useState(false);
 
   async function load() {
     const all = await getProducts();
@@ -54,15 +56,14 @@ export default function Products() {
     load();
   }
 
-  // FIX: Separate form reset from form close
   function closeForm() {
     setShowForm(false);
     setEditingId(null);
     setForm(emptyForm);
   }
 
-  function openNewForm() {
-    setForm(emptyForm);
+  function openNewForm(preFillSku?: string) {
+    setForm({ ...emptyForm, sku: preFillSku || "" });
     setEditingId(null);
     setShowForm(true);
   }
@@ -86,6 +87,23 @@ export default function Products() {
     load();
   }
 
+  // Barcode scan on the Products page:
+  // - If product with that SKU exists → open its edit form
+  // - If not found → open new product form with SKU pre-filled
+  function handleBarcodeScan(code: string) {
+    setShowScanner(false);
+    const existing = products.find(p =>
+      p.sku?.toLowerCase() === code.toLowerCase()
+    );
+    if (existing) {
+      startEdit(existing);
+      toast.success(`Product found: ${existing.name}`);
+    } else {
+      openNewForm(code);
+      toast.info(`New barcode "${code}" — fill in the product details`);
+    }
+  }
+
   if (loading) {
     return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" /></div>;
   }
@@ -96,6 +114,11 @@ export default function Products() {
 
   return (
     <div className="space-y-5 animate-fade-in">
+      {/* Barcode Scanner Modal */}
+      {showScanner && (
+        <BarcodeScanner onScan={handleBarcodeScan} onClose={() => setShowScanner(false)} />
+      )}
+
       {/* Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
@@ -137,15 +160,16 @@ export default function Products() {
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
           <div className="flex-1 sm:w-44">
-            <SelectField
-              value={filterCategory}
-              onValueChange={setFilterCategory}
-              options={filterCategoryOptions}
-              placeholder="All Categories"
-            />
+            <SelectField value={filterCategory} onValueChange={setFilterCategory} options={filterCategoryOptions} placeholder="All Categories" />
           </div>
-          {/* FIX: Use openNewForm() instead of resetForm() which was calling setShowForm(false) */}
-          <button onClick={openNewForm}
+          {/* Scan Barcode button — looks up by SKU, adds new if not found */}
+          <button onClick={() => setShowScanner(true)}
+            className="flex items-center gap-1.5 px-3 py-2.5 bg-secondary text-secondary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition whitespace-nowrap shrink-0"
+            title="Scan barcode to find or add product">
+            <Scan className="w-4 h-4" />
+            <span className="hidden sm:inline">Scan</span>
+          </button>
+          <button onClick={() => openNewForm()}
             className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition whitespace-nowrap">
             <Plus className="w-4 h-4" /> Add Product
           </button>
@@ -160,7 +184,10 @@ export default function Products() {
           onSubmit={handleSubmit}
         >
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-display font-semibold text-card-foreground">{editingId ? "Edit Product" : "New Product"}</h3>
+            <h3 className="font-display font-semibold text-card-foreground">
+              {editingId ? "Edit Product" : "New Product"}
+              {form.sku && !editingId && <span className="ml-2 text-xs text-muted-foreground font-normal">SKU: {form.sku}</span>}
+            </h3>
             <button type="button" onClick={closeForm} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition">
               <X className="w-4 h-4" />
             </button>
@@ -168,7 +195,7 @@ export default function Products() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <div className="sm:col-span-2 lg:col-span-1">
               <label className="text-xs font-medium text-muted-foreground mb-1 block">Name *</label>
-              <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Product name"
+              <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Product name" autoFocus
                 className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring" required />
             </div>
             <div>
@@ -176,8 +203,8 @@ export default function Products() {
               <SelectField value={form.category} onValueChange={v => setForm(f => ({ ...f, category: v }))} options={CATEGORY_OPTIONS} />
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">SKU / Code</label>
-              <input value={form.sku} onChange={e => setForm(f => ({ ...f, sku: e.target.value }))} placeholder="Optional"
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">SKU / Barcode</label>
+              <input value={form.sku} onChange={e => setForm(f => ({ ...f, sku: e.target.value }))} placeholder="Optional — scan or type"
                 className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
             </div>
             <div>
@@ -239,9 +266,14 @@ export default function Products() {
               {products.length === 0 ? "No products yet" : "No products match your search"}
             </p>
             {products.length === 0 && (
-              <button onClick={openNewForm} className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition">
-                Add First Product
-              </button>
+              <div className="mt-4 flex gap-2 justify-center">
+                <button onClick={() => openNewForm()} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition">
+                  Add First Product
+                </button>
+                <button onClick={() => setShowScanner(true)} className="px-4 py-2 bg-secondary text-secondary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition flex items-center gap-1.5">
+                  <Scan className="w-3.5 h-3.5" /> Scan Barcode
+                </button>
+              </div>
             )}
           </div>
         ) : (
@@ -264,7 +296,7 @@ export default function Products() {
                     <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground flex-wrap">
                       <span className="font-mono font-medium text-card-foreground">{formatCurrency(p.price)}/{p.unit}</span>
                       <span>{p.stock} {p.unit}</span>
-                      {p.sku && <span>#{p.sku}</span>}
+                      {p.sku && <span className="font-mono">#{p.sku}</span>}
                       {profitMargin && <span className="text-primary">{profitMargin}% margin</span>}
                     </div>
                   </div>
