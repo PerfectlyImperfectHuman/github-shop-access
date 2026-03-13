@@ -129,10 +129,10 @@ export default function Reports() {
             <h3 className="font-display font-semibold mb-4 text-card-foreground text-sm">Collection Status</h3>
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
-                <Pie data={pieData} cx="50%" cy="50%" innerRadius={55} outerRadius={85} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                <Pie data={pieData} cx="50%" cy="50%" innerRadius={55} outerRadius={85} dataKey="value" label={({ name, percent }: { name: string; percent?: number }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}>
                   {pieData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i]} />)}
                 </Pie>
-                <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                <Tooltip formatter={(value: unknown) => formatCurrency(Number(value))} />
               </PieChart>
             </ResponsiveContainer>
           </div>
