@@ -1,27 +1,31 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { BarChart3, Users, TrendingUp, TrendingDown, Percent } from "lucide-react";
+import { BarChart3, Users, TrendingUp, TrendingDown, Percent, ChevronRight } from "lucide-react";
 import { getCustomers, getTransactions, getCustomerBalance } from "@/lib/db";
 import { formatCurrency } from "@/lib/utils";
+import { useNavigate } from "react-router-dom";
 import type { Customer, Transaction } from "@/types";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, LineChart, Line, Legend
+} from "recharts";
 
-const CHART_COLORS = ["hsl(160, 84%, 39%)", "hsl(0, 72%, 51%)", "hsl(38, 92%, 50%)", "hsl(210, 92%, 55%)"];
+const COLORS = { credit: "#e24b4a", payment: "#1d9e75", outstanding: "#ba7517", recovered: "#1d9e75" };
 
 export default function Reports() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [topDebtors, setTopDebtors] = useState<{ name: string; balance: number }[]>([]);
+  const [topDebtors, setTopDebtors] = useState<{ name: string; balance: number; id: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     async function load() {
       const [custs, txns] = await Promise.all([getCustomers(), getTransactions()]);
       setCustomers(custs);
       setTransactions(txns);
-
       const debtors = await Promise.all(
-        custs.map(async c => ({ name: c.name, balance: await getCustomerBalance(c.id) }))
+        custs.map(async c => ({ id: c.id, name: c.name, balance: await getCustomerBalance(c.id) }))
       );
       setTopDebtors(debtors.filter(d => d.balance > 0).sort((a, b) => b.balance - a.balance).slice(0, 10));
       setLoading(false);
@@ -31,14 +35,15 @@ export default function Reports() {
 
   const totalCredit = transactions.filter(t => t.type === "credit").reduce((s, t) => s + t.amount, 0);
   const totalPayments = transactions.filter(t => t.type === "payment").reduce((s, t) => s + t.amount, 0);
-  const recoveryRate = totalCredit > 0 ? ((totalPayments / totalCredit) * 100).toFixed(1) : "N/A";
+  const outstanding = Math.max(0, totalCredit - totalPayments);
+  const recoveryRate = totalCredit > 0 ? ((totalPayments / totalCredit) * 100).toFixed(1) : "0";
 
   const pieData = [
-    { name: "Recovered", value: totalPayments },
-    { name: "Outstanding", value: Math.max(0, totalCredit - totalPayments) },
+    { name: "Collected", value: totalPayments },
+    { name: "Outstanding", value: outstanding },
   ];
 
-  // Monthly breakdown
+  // Monthly data (last 6 months)
   const monthlyData: Record<string, { credit: number; payment: number }> = {};
   transactions.forEach(t => {
     const month = new Date(t.date).toLocaleDateString("en-PK", { month: "short", year: "2-digit" });
@@ -49,10 +54,8 @@ export default function Reports() {
 
   // Daily trend (last 14 days)
   const dailyData: Record<string, { credit: number; payment: number }> = {};
-  const now = new Date();
   for (let i = 13; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
+    const d = new Date(); d.setDate(d.getDate() - i);
     const key = d.toLocaleDateString("en-PK", { day: "2-digit", month: "short" });
     dailyData[key] = { credit: 0, payment: 0 };
   }
@@ -69,103 +72,126 @@ export default function Reports() {
   return (
     <div className="space-y-5 animate-fade-in">
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Total Credit", val: formatCurrency(totalCredit), icon: TrendingUp, cls: "text-destructive" },
-          { label: "Total Payments", val: formatCurrency(totalPayments), icon: TrendingDown, cls: "text-success" },
-          { label: "Outstanding", val: formatCurrency(Math.max(0, totalCredit - totalPayments)), icon: BarChart3, cls: "text-warning" },
-          { label: "Recovery Rate", val: typeof recoveryRate === "string" ? `${recoveryRate}%` : "N/A", icon: Percent, cls: "text-primary" },
+          { label: "Total Credit", val: formatCurrency(totalCredit), icon: TrendingUp, cls: "text-destructive", bg: "bg-destructive/10" },
+          { label: "Total Payments", val: formatCurrency(totalPayments), icon: TrendingDown, cls: "text-success", bg: "bg-success/10" },
+          { label: "Outstanding", val: formatCurrency(outstanding), icon: BarChart3, cls: "text-warning", bg: "bg-warning/10" },
+          { label: "Recovery Rate", val: `${recoveryRate}%`, icon: Percent, cls: "text-primary", bg: "bg-primary/10" },
         ].map((c, i) => (
-          <motion.div key={c.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
+          <motion.div key={c.label} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}
             className="bg-card rounded-xl border border-border p-4 shadow-sm">
-            <div className="flex items-center gap-2">
-              <c.icon className={`w-4 h-4 ${c.cls}`} />
+            <div className="flex items-center gap-2 mb-1">
+              <div className={`p-1.5 rounded-lg ${c.bg}`}>
+                <c.icon className={`w-3.5 h-3.5 ${c.cls}`} />
+              </div>
               <p className="text-xs text-muted-foreground font-medium">{c.label}</p>
             </div>
-            <p className={`text-xl font-display font-bold mt-1 ${c.cls}`}>{c.val}</p>
+            <p className={`text-xl font-display font-bold ${c.cls}`}>{c.val}</p>
           </motion.div>
         ))}
       </div>
 
-      {/* 14-Day Trend */}
-      {lineData.length > 0 && transactions.length > 0 && (
-        <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
-          <h3 className="font-display font-semibold mb-4 text-card-foreground text-sm">14-Day Trend</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={lineData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 89%)" />
-              <XAxis dataKey="day" tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 10 }} />
-              <Tooltip formatter={(value: unknown) => formatCurrency(Number(value))} />
-              <Legend />
-              <Line type="monotone" dataKey="credit" stroke="hsl(0, 72%, 51%)" strokeWidth={2} name="Credit" dot={false} />
-              <Line type="monotone" dataKey="payment" stroke="hsl(142, 71%, 40%)" strokeWidth={2} name="Payment" dot={false} />
-            </LineChart>
-          </ResponsiveContainer>
+      {transactions.length === 0 ? (
+        <div className="text-center py-16 bg-card rounded-xl border border-border">
+          <BarChart3 className="w-12 h-12 mx-auto mb-3 text-muted-foreground/30" />
+          <p className="font-medium text-muted-foreground">No data to show yet</p>
+          <p className="text-xs text-muted-foreground mt-1">Start adding customers and transactions to see your reports</p>
+          <button onClick={() => navigate("/new-transaction")} className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition">
+            Record First Transaction
+          </button>
         </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Monthly Bar Chart */}
-        {barData.length > 0 && (
+      ) : (
+        <>
+          {/* 14-Day Trend */}
           <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
-            <h3 className="font-display font-semibold mb-4 text-card-foreground text-sm">Monthly Overview</h3>
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={barData}>
+            <h3 className="font-display font-semibold text-sm text-card-foreground mb-4">14-Day Trend</h3>
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={lineData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 89%)" />
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(value: unknown) => formatCurrency(Number(value))} />
-                <Bar dataKey="credit" fill="hsl(0, 72%, 51%)" name="Credit" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="payment" fill="hsl(142, 71%, 40%)" name="Payments" radius={[4, 4, 0, 0]} />
-              </BarChart>
+                <XAxis dataKey="day" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
+                <Tooltip formatter={(v: unknown) => formatCurrency(Number(v))} />
+                <Legend wrapperStyle={{ fontSize: "12px" }} />
+                <Line type="monotone" dataKey="credit" stroke={COLORS.credit} strokeWidth={2} name="Credit" dot={false} />
+                <Line type="monotone" dataKey="payment" stroke={COLORS.payment} strokeWidth={2} name="Payment" dot={false} />
+              </LineChart>
             </ResponsiveContainer>
           </div>
-        )}
 
-        {/* Pie Chart */}
-        {totalCredit > 0 && (
-          <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
-            <h3 className="font-display font-semibold mb-4 text-card-foreground text-sm">Collection Status</h3>
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie data={pieData} cx="50%" cy="50%" innerRadius={55} outerRadius={85} dataKey="value" label={(props: any) => `${props.name ?? ''} ${((props.percent ?? 0) * 100).toFixed(0)}%`}>
-                  {pieData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i]} />)}
-                </Pie>
-                <Tooltip formatter={(value: unknown) => formatCurrency(Number(value))} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-      </div>
-
-      {/* Top Debtors */}
-      {topDebtors.length > 0 && (
-        <div className="bg-card rounded-xl border border-border shadow-sm">
-          <div className="px-5 py-3 border-b border-border flex items-center gap-2">
-            <Users className="w-4 h-4 text-muted-foreground" />
-            <h3 className="font-display font-semibold text-sm text-card-foreground">Top Outstanding Balances</h3>
-          </div>
-          <div className="divide-y divide-border">
-            {topDebtors.map((d, i) => (
-              <div key={d.name} className="flex items-center justify-between px-5 py-3">
-                <div className="flex items-center gap-3">
-                  <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground">{i + 1}</span>
-                  <p className="text-sm font-medium text-card-foreground">{d.name}</p>
-                </div>
-                <p className="text-sm font-mono font-semibold text-destructive">{formatCurrency(d.balance)}</p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {/* Monthly Bar Chart */}
+            {barData.length > 0 && (
+              <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
+                <h3 className="font-display font-semibold text-sm text-card-foreground mb-4">Monthly Overview</h3>
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={barData} barGap={4}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 89%)" />
+                    <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} />
+                    <Tooltip formatter={(v: unknown) => formatCurrency(Number(v))} />
+                    <Legend wrapperStyle={{ fontSize: "12px" }} />
+                    <Bar dataKey="credit" fill={COLORS.credit} name="Credit" radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="payment" fill={COLORS.payment} name="Payment" radius={[3, 3, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+            )}
 
-      {transactions.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground">
-          <BarChart3 className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p className="font-medium">No data yet</p>
-          <p className="text-xs mt-1">Add customers and transactions to see reports</p>
-        </div>
+            {/* Pie Chart */}
+            {totalCredit > 0 && (
+              <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
+                <h3 className="font-display font-semibold text-sm text-card-foreground mb-4">Collection Status</h3>
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="value"
+                      label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
+                      labelLine={false}>
+                      <Cell fill={COLORS.payment} />
+                      <Cell fill={COLORS.credit} />
+                    </Pie>
+                    <Tooltip formatter={(v: unknown) => formatCurrency(Number(v))} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex items-center justify-center gap-4 mt-2">
+                  <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[#1d9e75]" /><span className="text-xs text-muted-foreground">Collected</span></div>
+                  <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[#e24b4a]" /><span className="text-xs text-muted-foreground">Outstanding</span></div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Top Debtors */}
+          {topDebtors.length > 0 && (
+            <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+              <div className="px-5 py-3 border-b border-border flex items-center gap-2">
+                <Users className="w-4 h-4 text-muted-foreground" />
+                <h3 className="font-display font-semibold text-sm text-card-foreground">Top Outstanding Balances</h3>
+              </div>
+              <div className="divide-y divide-border">
+                {topDebtors.map((d, i) => {
+                  const pct = totalCredit > 0 ? (d.balance / outstanding * 100) : 0;
+                  return (
+                    <div key={d.name} className="flex items-center gap-3 px-5 py-3 hover:bg-muted/20 transition-colors cursor-pointer"
+                      onClick={() => navigate(`/customers/${d.id}`)}>
+                      <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground shrink-0">{i + 1}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-card-foreground truncate">{d.name}</p>
+                        <div className="h-1.5 bg-muted rounded-full mt-1 overflow-hidden">
+                          <div className="h-full bg-destructive/60 rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%` }} />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <p className="text-sm font-mono font-semibold text-destructive">{formatCurrency(d.balance)}</p>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground/30" />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

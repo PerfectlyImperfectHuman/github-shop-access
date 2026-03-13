@@ -9,6 +9,7 @@ import TransactionHistory from "./pages/TransactionHistory";
 import Products from "./pages/Products";
 import Reports from "./pages/Reports";
 import SettingsPage from "./pages/Settings";
+import SaleReceipt from "./pages/SaleReceipt";
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="/new-transaction" element={<NewTransaction />} />
           <Route path="/transactions" element={<TransactionHistory />} />
           <Route path="/products" element={<Products />} />
+          <Route path="/sale" element={<SaleReceipt />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>

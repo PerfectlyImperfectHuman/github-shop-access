@@ -20,11 +20,9 @@ class ShopDatabase extends Dexie {
 
 export const db = new ShopDatabase();
 
-// Initialize default settings
 export async function initSettings(): Promise<Settings> {
   const existing = await db.settings.get("default");
   if (existing) return existing;
-
   const defaults: Settings = {
     id: "default",
     currency: "Rs.",
@@ -42,15 +40,9 @@ export async function initSettings(): Promise<Settings> {
   return defaults;
 }
 
-// Customer operations
 export async function addCustomer(customer: Omit<Customer, "id" | "createdAt" | "updatedAt">): Promise<Customer> {
   const now = new Date().toISOString();
-  const newCustomer: Customer = {
-    ...customer,
-    id: crypto.randomUUID(),
-    createdAt: now,
-    updatedAt: now,
-  };
+  const newCustomer: Customer = { ...customer, id: crypto.randomUUID(), createdAt: now, updatedAt: now };
   await db.customers.put(newCustomer);
   return newCustomer;
 }
@@ -66,11 +58,11 @@ export async function deleteCustomer(id: string): Promise<void> {
   });
 }
 
+// FIX: Use in-memory filter instead of Dexie boolean index (Dexie booleans can be inconsistent)
 export async function getCustomers(activeOnly = false): Promise<Customer[]> {
-  if (activeOnly) {
-    return db.customers.where("isActive").equals(1).toArray();
-  }
-  return db.customers.toArray();
+  const all = await db.customers.toArray();
+  if (activeOnly) return all.filter(c => c.isActive === true);
+  return all;
 }
 
 export async function getCustomer(id: string): Promise<Customer | undefined> {
@@ -82,15 +74,9 @@ export async function getCustomerBalance(customerId: string): Promise<number> {
   return txns.reduce((bal, t) => bal + (t.type === "credit" ? t.amount : -t.amount), 0);
 }
 
-// Product operations
 export async function addProduct(product: Omit<Product, "id" | "createdAt" | "updatedAt">): Promise<Product> {
   const now = new Date().toISOString();
-  const newProduct: Product = {
-    ...product,
-    id: crypto.randomUUID(),
-    createdAt: now,
-    updatedAt: now,
-  };
+  const newProduct: Product = { ...product, id: crypto.randomUUID(), createdAt: now, updatedAt: now };
   await db.products.put(newProduct);
   return newProduct;
 }
@@ -103,11 +89,11 @@ export async function deleteProduct(id: string): Promise<void> {
   await db.products.delete(id);
 }
 
+// FIX: Use in-memory filter instead of Dexie boolean index
 export async function getProducts(activeOnly = false): Promise<Product[]> {
-  if (activeOnly) {
-    return db.products.where("isActive").equals(1).toArray();
-  }
-  return db.products.toArray();
+  const all = await db.products.toArray();
+  if (activeOnly) return all.filter(p => p.isActive === true);
+  return all;
 }
 
 export async function getProduct(id: string): Promise<Product | undefined> {
@@ -117,34 +103,22 @@ export async function getProduct(id: string): Promise<Product | undefined> {
 export async function updateProductStock(id: string, quantityChange: number): Promise<void> {
   const product = await db.products.get(id);
   if (product) {
-    await db.products.update(id, {
-      stock: product.stock + quantityChange,
-      updatedAt: new Date().toISOString(),
-    });
+    await db.products.update(id, { stock: Math.max(0, product.stock + quantityChange), updatedAt: new Date().toISOString() });
   }
 }
 
-// Transaction operations
 export async function addTransaction(txn: Omit<Transaction, "id" | "createdAt">): Promise<Transaction> {
-  const newTxn: Transaction = {
-    ...txn,
-    id: crypto.randomUUID(),
-    createdAt: new Date().toISOString(),
-  };
+  const newTxn: Transaction = { ...txn, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
   await db.transactions.put(newTxn);
-
-  // Update product stock if linked
   if (txn.productId && txn.quantity && txn.type === "credit") {
     await updateProductStock(txn.productId, -txn.quantity);
   }
-
   return newTxn;
 }
 
 export async function deleteTransaction(id: string): Promise<void> {
   const txn = await db.transactions.get(id);
   if (txn) {
-    // Restore stock if product-linked
     if (txn.productId && txn.quantity && txn.type === "credit") {
       await updateProductStock(txn.productId, txn.quantity);
     }
@@ -159,18 +133,7 @@ export async function getTransactions(customerId?: string): Promise<Transaction[
   return db.transactions.reverse().sortBy("date");
 }
 
-export async function getDashboardStats(): Promise<{
-  totalCustomers: number;
-  activeCustomers: number;
-  totalCredit: number;
-  totalPayments: number;
-  outstandingBalance: number;
-  todayCredit: number;
-  todayPayments: number;
-  weekCredit: number;
-  weekPayments: number;
-  lowStockProducts: number;
-}> {
+export async function getDashboardStats() {
   const customers = await db.customers.toArray();
   const transactions = await db.transactions.toArray();
   const products = await db.products.toArray();
@@ -178,14 +141,11 @@ export async function getDashboardStats(): Promise<{
   const totalCredit = transactions.filter(t => t.type === "credit").reduce((s, t) => s + t.amount, 0);
   const totalPayments = transactions.filter(t => t.type === "payment").reduce((s, t) => s + t.amount, 0);
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const weekAgo = new Date(today);
-  weekAgo.setDate(weekAgo.getDate() - 7);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate() - 7);
 
   const todayTxns = transactions.filter(t => new Date(t.date) >= today);
   const weekTxns = transactions.filter(t => new Date(t.date) >= weekAgo);
-
   const lowStockProducts = products.filter(p => p.isActive && p.stock <= p.minStock).length;
 
   return {
@@ -213,21 +173,9 @@ export async function exportData(): Promise<string> {
 export async function importData(json: string): Promise<void> {
   const data = JSON.parse(json);
   await db.transaction("rw", db.customers, db.transactions, db.settings, db.products, async () => {
-    if (data.customers) {
-      await db.customers.clear();
-      await db.customers.bulkPut(data.customers);
-    }
-    if (data.transactions) {
-      await db.transactions.clear();
-      await db.transactions.bulkPut(data.transactions);
-    }
-    if (data.settings) {
-      await db.settings.clear();
-      await db.settings.bulkPut(data.settings);
-    }
-    if (data.products) {
-      await db.products.clear();
-      await db.products.bulkPut(data.products);
-    }
+    if (data.customers) { await db.customers.clear(); await db.customers.bulkPut(data.customers); }
+    if (data.transactions) { await db.transactions.clear(); await db.transactions.bulkPut(data.transactions); }
+    if (data.settings) { await db.settings.clear(); await db.settings.bulkPut(data.settings); }
+    if (data.products) { await db.products.clear(); await db.products.bulkPut(data.products); }
   });
 }

@@ -48,7 +48,7 @@
     --foreground: 210 15% 93%;
     --card: 222 25% 9%;
     --card-foreground: 210 15% 93%;
-    --popover: 222 25% 9%;
+    --popover: 222 25% 10%;
     --popover-foreground: 210 15% 93%;
     --primary: 160 84% 44%;
     --primary-foreground: 0 0% 100%;
@@ -73,11 +73,6 @@
     --sidebar-foreground: 210 15% 85%;
     --sidebar-accent: 222 25% 10%;
     --sidebar-accent-foreground: 210 15% 90%;
-    --chart-1: 160 84% 44%;
-    --chart-2: 210 92% 60%;
-    --chart-3: 38 92% 55%;
-    --chart-4: 0 72% 55%;
-    --chart-5: 280 65% 60%;
   }
 }
 
@@ -87,6 +82,7 @@
   }
   body {
     @apply bg-background text-foreground font-sans antialiased;
+    -webkit-tap-highlight-color: transparent;
   }
 }
 
@@ -97,38 +93,57 @@
   .gradient-card {
     background: linear-gradient(135deg, hsl(var(--card)), hsl(var(--accent)));
   }
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
 }
 
 /* Print styles */
 @media print {
-  body * {
-    visibility: hidden;
+  /* Hide everything except receipt */
+  body * { visibility: hidden; }
+  .receipt-print-area,
+  .receipt-print-area * { visibility: visible !important; display: revert !important; }
+  .receipt-print-area {
+    position: fixed !important;
+    inset: 0 !important;
+    display: flex !important;
+    align-items: flex-start !important;
+    justify-content: center !important;
+    background: white !important;
   }
-  .print-area, .print-area * {
-    visibility: visible;
-  }
-  .print-area {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-  }
-  .no-print {
-    display: none !important;
+  /* Legacy print-area support */
+  .print-area, .print-area * { visibility: visible; }
+  .print-area { position: absolute; left: 0; top: 0; width: 100%; }
+  .no-print { display: none !important; }
+  /* Page setup for 80mm thermal paper */
+  @page {
+    size: 80mm auto;
+    margin: 4mm;
   }
 }
 
 /* Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / 0.2); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.4); }
+
+/* Native input[type=date] calendar icon tint */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 0.5;
+  cursor: pointer;
+  filter: invert(0);
 }
-::-webkit-scrollbar-track {
-  background: hsl(var(--muted));
+.dark input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
 }
-::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / 0.3);
-  border-radius: 3px;
+
+/* Radix Select Content animation */
+[data-radix-select-content] {
+  animation: selectSlideIn 0.12s ease-out;
 }
-::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.5);
+@keyframes selectSlideIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
