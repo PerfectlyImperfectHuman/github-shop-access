@@ -29,7 +29,7 @@ export interface Product {
 
 export interface Transaction {
   id: string;
-  customerId: string;        // empty string "" for cash sales (type === "sale")
+  customerId: string;
   type: "credit" | "payment" | "sale";
   amount: number;
   description: string;
@@ -51,20 +51,7 @@ export interface Settings {
   language: string;
   taxRate: number;
   receiptFooter: string;
-}
-
-export interface DashboardStats {
-  totalCustomers: number;
-  activeCustomers: number;
-  totalCredit: number;
-  totalPayments: number;
-  outstandingBalance: number;
-  recentTransactions: Transaction[];
-  todayCredit: number;
-  todayPayments: number;
-  todayCashSales: number;
-  weekCredit: number;
-  weekPayments: number;
+  shopType: "kiryana" | "pro" | "";
 }
 
 export interface DailySummary {

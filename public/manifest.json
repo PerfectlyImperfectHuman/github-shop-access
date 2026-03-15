@@ -1,56 +1,23 @@
 {
-  "name": "Dukan Manager – Shop Management for Pakistan",
-  "short_name": "Dukan Manager",
-  "description": "Pakistan's #1 offline shop management app. Track udhar, khata, customers, inventory & payments.",
+  "name": "Bahi – Pakistan ka Digital Khata",
+  "short_name": "Bahi",
+  "description": "Pakistan ka digital bahi khata. Udhar track karein, customers manage karein, daily closing karein.",
   "start_url": "/",
   "id": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#0d9668",
   "theme_color": "#0d9668",
-  "orientation": "any",
+  "orientation": "portrait",
   "icons": [
-    {
-      "src": "/favicon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any"
-    },
-    {
-      "src": "/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ],
   "shortcuts": [
-    {
-      "name": "New Udhar",
-      "short_name": "Udhar",
-      "description": "Record a new credit entry",
-      "url": "/new-transaction?type=credit",
-      "icons": [{ "src": "/favicon.svg", "sizes": "any" }]
-    },
-    {
-      "name": "POS Sale",
-      "short_name": "Sale",
-      "description": "Open point of sale",
-      "url": "/sale",
-      "icons": [{ "src": "/favicon.svg", "sizes": "any" }]
-    },
-    {
-      "name": "Daily Close",
-      "short_name": "Close",
-      "description": "End of day report",
-      "url": "/daily-close",
-      "icons": [{ "src": "/favicon.svg", "sizes": "any" }]
-    }
+    { "name": "New Udhar", "short_name": "Udhar", "url": "/new-transaction?type=credit", "icons": [{ "src": "/favicon.svg", "sizes": "any" }] },
+    { "name": "POS Sale",  "short_name": "Sale",  "url": "/sale",                        "icons": [{ "src": "/favicon.svg", "sizes": "any" }] },
+    { "name": "Daily Close","short_name": "Close", "url": "/daily-close",                "icons": [{ "src": "/favicon.svg", "sizes": "any" }] }
   ],
   "categories": ["business", "finance", "productivity"]
 }
