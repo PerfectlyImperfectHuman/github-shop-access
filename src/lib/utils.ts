@@ -30,6 +30,13 @@ export function getGreeting(): string {
   return "Good Evening";
 }
 
+export function getGreetingKey(): "good_morning" | "good_afternoon" | "good_evening" {
+  const hour = new Date().getHours();
+  if (hour < 12) return "good_morning";
+  if (hour < 17) return "good_afternoon";
+  return "good_evening";
+}
+
 export function isToday(date: string): boolean {
   const d = new Date(date);
   const today = new Date();
@@ -40,4 +47,18 @@ export function daysAgo(date: string): number {
   const d = new Date(date);
   const now = new Date();
   return Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+/** Convert local PK phone to international format for wa.me links */
+export function toIntlPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.startsWith("0")) return "92" + digits.slice(1);
+  if (digits.startsWith("92")) return digits;
+  return "92" + digits;
+}
+
+/** Open a WhatsApp share link in a new tab. If `phone` empty → goes to wa.me/?text= for forwarding. */
+export function shareOnWhatsApp(text: string, phone?: string) {
+  const base = phone ? `https://wa.me/${toIntlPhone(phone)}` : "https://wa.me/";
+  window.open(`${base}?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
 }

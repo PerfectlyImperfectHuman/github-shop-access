@@ -14,6 +14,7 @@ import SaleReceipt from "./pages/SaleReceipt";
 import DailyClose from "./pages/DailyClose";
 import FirstRun from "./pages/FirstRun";
 import { initSettings } from "./lib/db";
+import { LanguageProvider } from "./contexts/LanguageContext";
 
 export default function App() {
   const [ready, setReady] = useState<boolean | null>(null); // null = loading
@@ -49,22 +50,24 @@ export default function App() {
   }
 
   return (
-    <BrowserRouter>
-      <Toaster position="top-center" richColors />
-      <Routes>
-        <Route element={<Layout />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/customers" element={<Customers />} />
-          <Route path="/customers/:id" element={<CustomerLedger />} />
-          <Route path="/new-transaction" element={<NewTransaction />} />
-          <Route path="/transactions" element={<TransactionHistory />} />
-          <Route path="/products" element={<Products />} />
-          <Route path="/sale" element={<SaleReceipt />} />
-          <Route path="/reports" element={<Reports />} />
-          <Route path="/daily-close" element={<DailyClose />} />
-          <Route path="/settings" element={<SettingsPage />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <LanguageProvider>
+      <BrowserRouter>
+        <Toaster position="top-center" richColors />
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/customers" element={<Customers />} />
+            <Route path="/customers/:id" element={<CustomerLedger />} />
+            <Route path="/new-transaction" element={<NewTransaction />} />
+            <Route path="/transactions" element={<TransactionHistory />} />
+            <Route path="/products" element={<Products />} />
+            <Route path="/sale" element={<SaleReceipt />} />
+            <Route path="/reports" element={<Reports />} />
+            <Route path="/daily-close" element={<DailyClose />} />
+            <Route path="/settings" element={<SettingsPage />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </LanguageProvider>
   );
 }
