@@ -84,6 +84,30 @@
     @apply bg-background text-foreground font-sans antialiased;
     -webkit-tap-highlight-color: transparent;
   }
+
+  /* Urdu Nastaliq typography */
+  html.lang-ur body {
+    font-family: 'Noto Nastaliq Urdu', 'Inter', sans-serif;
+    line-height: 2;
+  }
+  html.lang-ur input,
+  html.lang-ur button,
+  html.lang-ur textarea,
+  html.lang-ur select {
+    font-family: 'Noto Nastaliq Urdu', 'Inter', sans-serif;
+  }
+  /* Numbers, currency, monospace stay Latin */
+  html.lang-ur .font-mono,
+  html.lang-ur input[type="number"],
+  html.lang-ur input[type="date"],
+  html.lang-ur input[type="tel"] {
+    font-family: 'JetBrains Mono', monospace;
+    direction: ltr;
+    text-align: left;
+  }
+  html.lang-ur [dir="ltr"] {
+    direction: ltr;
+  }
 }
 
 @layer utilities {
@@ -98,9 +122,8 @@
   }
 }
 
-/* Print styles */
+/* Print styles — supports both 58mm (default) and 80mm thermal printers */
 @media print {
-  /* Hide everything except receipt */
   body * { visibility: hidden; }
   .receipt-print-area,
   .receipt-print-area * { visibility: visible !important; display: revert !important; }
@@ -112,24 +135,50 @@
     justify-content: center !important;
     background: white !important;
   }
-  /* Legacy print-area support */
   .print-area, .print-area * { visibility: visible; }
   .print-area { position: absolute; left: 0; top: 0; width: 100%; }
   .no-print { display: none !important; }
-  /* Page setup for 80mm thermal paper */
+
+  /* Default to 58mm — most Pakistani shops */
   @page {
-    size: 80mm auto;
-    margin: 4mm;
+    size: 58mm auto;
+    margin: 2mm;
   }
+  .receipt-print-area .receipt-58 {
+    width: 54mm !important;
+    font-size: 10px !important;
+    padding: 1mm !important;
+  }
+  .receipt-print-area .receipt-58 table { font-size: 9px !important; }
+  .receipt-print-area .receipt-58 .receipt-title { font-size: 13px !important; }
+  .receipt-print-area .receipt-58 .receipt-total { font-size: 11px !important; }
+
+  /* When the user picked 80mm, we override the page size + receipt width */
+  html[data-printer-width="80mm"] {
+    /* page rule must be inside this scope */
+  }
+  html[data-printer-width="80mm"] .receipt-print-area .receipt-58,
+  html[data-printer-width="80mm"] .receipt-print-area .receipt-80 {
+    width: 76mm !important;
+    font-size: 12px !important;
+    padding: 3mm !important;
+  }
+  html[data-printer-width="80mm"] .receipt-print-area .receipt-58 table,
+  html[data-printer-width="80mm"] .receipt-print-area .receipt-80 table { font-size: 11px !important; }
+  html[data-printer-width="80mm"] .receipt-print-area .receipt-58 .receipt-title,
+  html[data-printer-width="80mm"] .receipt-print-area .receipt-80 .receipt-title { font-size: 16px !important; }
+  html[data-printer-width="80mm"] .receipt-print-area .receipt-58 .receipt-total,
+  html[data-printer-width="80mm"] .receipt-print-area .receipt-80 .receipt-total { font-size: 13px !important; }
 }
 
-/* Scrollbar */
+/* Dynamic @page can't change inside a single document at runtime in all browsers,
+   so we set the @page in JS by injecting a style — see PrinterWidthStyle in App. */
+
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / 0.2); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.4); }
 
-/* Native input[type=date] calendar icon tint */
 input[type="date"]::-webkit-calendar-picker-indicator {
   opacity: 0.5;
   cursor: pointer;
@@ -139,7 +188,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   filter: invert(1);
 }
 
-/* Radix Select Content animation */
 [data-radix-select-content] {
   animation: selectSlideIn 0.12s ease-out;
 }
