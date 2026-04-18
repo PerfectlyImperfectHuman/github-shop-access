@@ -293,7 +293,7 @@ export async function exportData(): Promise<string> {
 
 export async function importData(json: string): Promise<void> {
   const data = JSON.parse(json);
-  await db.transaction("rw", db.customers, db.suppliers, db.transactions, db.settings, db.products, db.expenses, async () => {
+  await db.transaction("rw", [db.customers, db.suppliers, db.transactions, db.settings, db.products, db.expenses], async () => {
     if (data.customers)    { await db.customers.clear();    await db.customers.bulkPut(data.customers); }
     if (data.suppliers)    { await db.suppliers.clear();    await db.suppliers.bulkPut(data.suppliers); }
     if (data.transactions) { await db.transactions.clear(); await db.transactions.bulkPut(data.transactions); }
