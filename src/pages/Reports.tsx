@@ -61,7 +61,7 @@ export default function Reports() {
   }
   transactions.forEach(t => {
     const key = new Date(t.date).toLocaleDateString("en-PK", { day: "2-digit", month: "short" });
-    if (dailyData[key]) dailyData[key][t.type] += t.amount;
+    if (dailyData[key] && (t.type === "credit" || t.type === "payment")) dailyData[key][t.type] += t.amount;
   });
   const lineData = Object.entries(dailyData).map(([day, d]) => ({ day, ...d }));
 
