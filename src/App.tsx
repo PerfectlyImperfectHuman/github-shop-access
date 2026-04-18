@@ -14,6 +14,7 @@ import SaleReceipt from "./pages/SaleReceipt";
 import DailyClose from "./pages/DailyClose";
 import FirstRun from "./pages/FirstRun";
 import { initSettings } from "./lib/db";
+import { LanguageProvider } from "./contexts/LanguageContext";
 
 export default function App() {
   const [ready, setReady] = useState<boolean | null>(null); // null = loading
