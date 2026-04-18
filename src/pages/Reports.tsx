@@ -48,7 +48,7 @@ export default function Reports() {
   transactions.forEach(t => {
     const month = new Date(t.date).toLocaleDateString("en-PK", { month: "short", year: "2-digit" });
     if (!monthlyData[month]) monthlyData[month] = { credit: 0, payment: 0 };
-    monthlyData[month][t.type] += t.amount;
+    if (t.type === "credit" || t.type === "payment") monthlyData[month][t.type] += t.amount;
   });
   const barData = Object.entries(monthlyData).map(([month, d]) => ({ month, ...d })).slice(-6);
 
@@ -61,7 +61,7 @@ export default function Reports() {
   }
   transactions.forEach(t => {
     const key = new Date(t.date).toLocaleDateString("en-PK", { day: "2-digit", month: "short" });
-    if (dailyData[key]) dailyData[key][t.type] += t.amount;
+    if (dailyData[key] && (t.type === "credit" || t.type === "payment")) dailyData[key][t.type] += t.amount;
   });
   const lineData = Object.entries(dailyData).map(([day, d]) => ({ day, ...d }));
 
