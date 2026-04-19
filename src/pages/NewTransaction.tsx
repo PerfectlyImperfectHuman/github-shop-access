@@ -19,7 +19,7 @@ interface CartItem { product: Product; qty: number; unitPrice: number; }
 interface SavedUdhar { customer: Customer; items: CartItem[]; total: number; date: string; receiptNo: string; }
 
 export default function NewTransaction() {
-  const { shopType } = useLanguage();
+  const { shopType, t } = useLanguage();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [mode, setMode] = useState<"credit" | "payment">(searchParams.get("type") === "payment" ? "payment" : "credit");
@@ -155,7 +155,7 @@ export default function NewTransaction() {
       {/* Print-only receipt */}
       {savedUdhar && (
         <div className="receipt-print-area hidden print:block">
-          <div style={{ fontFamily: "monospace", fontSize: "12px", width: "80mm", margin: "0 auto", padding: "4mm" }}>
+          <div className="receipt-58" style={{ fontFamily: "monospace", fontSize: "12px", width: "80mm", margin: "0 auto", padding: "4mm" }}>
             <div style={{ textAlign: "center", marginBottom: "8px" }}>
               <div style={{ fontSize: "16px", fontWeight: "bold" }}>{shopName}</div>
               <div style={{ fontSize: "10px", marginTop: "2px" }}>{new Date(savedUdhar.date).toLocaleDateString("en-PK", { day: "2-digit", month: "short", year: "numeric" })}</div>
@@ -316,10 +316,12 @@ export default function NewTransaction() {
           <>
             {/* Add toolbar */}
             <div className="flex gap-2">
-              <button onClick={() => setShowScanner(true)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:opacity-90 transition shrink-0">
-                <Scan className="w-4 h-4" /> Scan
-              </button>
+              {shopType !== "kiryana" && (
+                <button onClick={() => setShowScanner(true)}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:opacity-90 transition shrink-0">
+                  <Scan className="w-4 h-4" /> {t("scan")}
+                </button>
+              )}
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input type="text" placeholder="Search products to add..."
