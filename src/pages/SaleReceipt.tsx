@@ -9,11 +9,13 @@ import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { Product, Customer, Settings } from "@/types";
 
 interface CartItem { product: Product; qty: number; unitPrice: number; }
 
 export default function SaleReceipt() {
+  const { t, shopType } = useLanguage();
   const [products, setProducts]   = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [settings, setSettings]   = useState<Settings | null>(null);
@@ -40,8 +42,11 @@ export default function SaleReceipt() {
   }, []);
 
   const subtotal = cart.reduce((s, i) => s + i.qty * i.unitPrice, 0);
+  const taxRatePct = settings?.taxRate ?? 0;
+  const taxAmount = taxRatePct > 0 ? subtotal * (taxRatePct / 100) : 0;
+  const grandTotal = subtotal + taxAmount;
   const cash     = parseFloat(cashReceived) || 0;
-  const change   = cash - subtotal;
+  const change   = cash - grandTotal;
 
   function addToCart(product: Product) {
     setCart(prev => {
@@ -74,9 +79,9 @@ export default function SaleReceipt() {
     try {
       const desc = cart.map(i => `${i.product.name} ×${i.qty}`).join(", ");
       if (saleMode === "credit" && selectedCustomer) {
-        await addTransaction({ customerId: selectedCustomer.id, type: "credit", amount: subtotal, description: `Sale: ${desc}`, date: new Date().toISOString() });
+        await addTransaction({ customerId: selectedCustomer.id, type: "credit", amount: grandTotal, description: `Sale: ${desc}`, date: new Date().toISOString() });
       } else {
-        await addTransaction({ customerId: selectedCustomer?.id || "", type: "sale", amount: subtotal, description: `Cash Sale: ${desc}`, date: new Date().toISOString() });
+        await addTransaction({ customerId: selectedCustomer?.id || "", type: "sale", amount: grandTotal, description: `Cash Sale: ${desc}`, date: new Date().toISOString() });
       }
       await Promise.all(cart.map(i => updateProductStock(i.product.id, -i.qty)));
       setSaved(true); setReceiptVisible(true);
@@ -103,7 +108,7 @@ export default function SaleReceipt() {
     <>
       {/* Print-only receipt */}
       <div className="receipt-print-area hidden print:block">
-        <div style={{ fontFamily: "monospace", fontSize: "12px", width: "80mm", margin: "0 auto", padding: "4mm" }}>
+        <div className="receipt-58" style={{ fontFamily: "monospace", fontSize: "12px", width: "80mm", margin: "0 auto", padding: "4mm" }}>
           <div style={{ textAlign: "center", marginBottom: "8px" }}>
             <div style={{ fontSize: "16px", fontWeight: "bold" }}>{shopName}</div>
             {shopPhone && <div>{shopPhone}</div>}
@@ -139,8 +144,16 @@ export default function SaleReceipt() {
             </tbody>
           </table>
           <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "2px" }}>
+            <span>Subtotal</span><span>Rs. {subtotal.toLocaleString()}</span>
+          </div>
+          {taxRatePct > 0 && (
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "4px" }}>
+              <span>Tax ({taxRatePct}%)</span><span>Rs. {taxAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+            </div>
+          )}
           <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold", fontSize: "13px" }}>
-            <span>TOTAL</span><span>Rs. {subtotal.toLocaleString()}</span>
+            <span>TOTAL</span><span>Rs. {grandTotal.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
           </div>
           {saleMode === "cash" && cash > 0 && <>
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: "3px", fontSize: "11px" }}>
@@ -172,7 +185,7 @@ export default function SaleReceipt() {
                 <div>
                   <h3 className="font-display font-bold text-lg text-card-foreground">Sale Saved!</h3>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Total: <span className="font-semibold text-card-foreground">{formatCurrency(subtotal)}</span>
+                    Total: <span className="font-semibold text-card-foreground">{formatCurrency(grandTotal)}</span>
                     {saleMode === "cash" && cash > 0 && change >= 0 && <> · Change: <span className="font-semibold text-success">{formatCurrency(change)}</span></>}
                   </p>
                 </div>
@@ -222,8 +235,8 @@ export default function SaleReceipt() {
         {/* Page header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="font-display font-bold text-xl text-foreground">New Sale</h1>
-            <p className="text-sm text-muted-foreground">Scan · Add items · Print receipt</p>
+            <h1 className="font-display font-bold text-xl text-foreground">{t("nav_pos")}</h1>
+            <p className="text-sm text-muted-foreground">{shopType === "kiryana" ? t("nav_pos") : "Scan · Add items · Print receipt"}</p>
           </div>
           {cart.length > 0 && (
             <button onClick={startNewSale} className="text-xs text-muted-foreground hover:text-destructive transition flex items-center gap-1">
@@ -234,10 +247,12 @@ export default function SaleReceipt() {
 
         {/* Add items toolbar */}
         <div className="flex gap-2">
-          <button onClick={() => setShowScanner(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:opacity-90 transition shrink-0">
-            <Scan className="w-4 h-4" /> Scan
-          </button>
+          {shopType !== "kiryana" && (
+            <button onClick={() => setShowScanner(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:opacity-90 transition shrink-0">
+              <Scan className="w-4 h-4" /> {t("scan")}
+            </button>
+          )}
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input type="text" placeholder="Search products..."
@@ -317,9 +332,23 @@ export default function SaleReceipt() {
                   </div>
                 </div>
               ))}
-              <div className="flex items-center justify-between px-4 py-3 bg-muted/30">
-                <span className="font-display font-bold text-sm text-card-foreground">Total</span>
-                <span className="font-display font-bold text-lg text-primary font-mono">{formatCurrency(subtotal)}</span>
+              <div className="px-4 py-3 bg-muted/30 space-y-1">
+                {taxRatePct > 0 && (
+                  <>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>Subtotal</span>
+                      <span className="font-mono">{formatCurrency(subtotal)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>Tax ({taxRatePct}%)</span>
+                      <span className="font-mono">{formatCurrency(taxAmount)}</span>
+                    </div>
+                  </>
+                )}
+                <div className="flex items-center justify-between">
+                  <span className="font-display font-bold text-sm text-card-foreground">Total</span>
+                  <span className="font-display font-bold text-lg text-primary font-mono">{formatCurrency(grandTotal)}</span>
+                </div>
               </div>
             </div>
           )}
@@ -344,7 +373,7 @@ export default function SaleReceipt() {
             {saleMode === "cash" && (
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Cash Received (Rs.)</label>
-                <input type="number" value={cashReceived} onChange={e => setCashReceived(e.target.value)} placeholder={subtotal.toString()}
+                <input type="number" value={cashReceived} onChange={e => setCashReceived(e.target.value)} placeholder={grandTotal.toString()}
                   className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-lg font-mono font-bold focus:outline-none focus:ring-2 focus:ring-ring"
                 />
                 {cash > 0 && (
@@ -354,8 +383,8 @@ export default function SaleReceipt() {
                   </div>
                 )}
                 <div className="flex gap-2 mt-2 flex-wrap">
-                  {[Math.ceil(subtotal / 100) * 100, Math.ceil(subtotal / 500) * 500, Math.ceil(subtotal / 1000) * 1000]
-                    .filter((v, i, arr) => arr.indexOf(v) === i && v >= subtotal).slice(0, 4)
+                  {[Math.ceil(grandTotal / 100) * 100, Math.ceil(grandTotal / 500) * 500, Math.ceil(grandTotal / 1000) * 1000]
+                    .filter((v, i, arr) => arr.indexOf(v) === i && v >= grandTotal).slice(0, 4)
                     .map(amt => (
                       <button key={amt} onClick={() => setCashReceived(String(amt))}
                         className="text-xs px-3 py-1.5 rounded-lg bg-muted text-muted-foreground hover:bg-primary hover:text-primary-foreground transition font-mono">
@@ -393,7 +422,7 @@ export default function SaleReceipt() {
               {saving
                 ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 : saved ? <><Check className="w-4 h-4" /> Saved!</>
-                : <><Check className="w-4 h-4" /> Save Sale · {formatCurrency(subtotal)}</>
+                : <><Check className="w-4 h-4" /> Save Sale · {formatCurrency(grandTotal)}</>
               }
             </button>
             {saved && (

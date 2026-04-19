@@ -103,7 +103,7 @@ export default function FirstRun({ onComplete }: FirstRunProps) {
       <div className="flex-1 px-4 py-6 space-y-4 max-w-lg mx-auto w-full">
         <div className="text-center mb-2">
           <h2 className="text-lg font-display font-bold text-foreground">Apni dukan ka type chunein</h2>
-          <p className="text-sm text-muted-foreground mt-0.5">Choose your shop type to get the right features</p>
+          <p className="text-sm text-muted-foreground mt-0.5">اپنی دکان کا قسم چنیں — Choose your shop type</p>
         </div>
 
         {modes.map((mode, i) => {

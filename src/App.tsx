@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
 import { useEffect, useState } from "react";
 import Layout from "./components/Layout";
@@ -13,17 +13,40 @@ import SettingsPage from "./pages/Settings";
 import SaleReceipt from "./pages/SaleReceipt";
 import DailyClose from "./pages/DailyClose";
 import FirstRun from "./pages/FirstRun";
+import Suppliers from "./pages/Suppliers";
+import SupplierLedger from "./pages/SupplierLedger";
+import PinLock from "./pages/PinLock";
 import { initSettings } from "./lib/db";
+import { isPinSessionUnlocked } from "./lib/pinSession";
+import { LanguageProvider } from "./contexts/LanguageContext";
+import type { Settings } from "./types";
+
+type BootPhase = "splash" | "first_run" | "pin" | "main";
 
 export default function App() {
-  const [ready, setReady] = useState<boolean | null>(null); // null = loading
+  const [phase, setPhase] = useState<BootPhase>("splash");
+  const [settings, setSettings] = useState<Settings | null>(null);
 
   useEffect(() => {
-    initSettings().then(s => setReady(!!s.shopType));
+    initSettings().then(s => {
+      setSettings(s);
+      if (!s.shopType) setPhase("first_run");
+      else if (s.pinEnabled && /^\d{4}$/.test(s.pinCode) && !isPinSessionUnlocked()) setPhase("pin");
+      else setPhase("main");
+    });
   }, []);
 
-  // Loading splash
-  if (ready === null) {
+  const handleFirstRunComplete = () => {
+    initSettings().then(s => {
+      setSettings(s);
+      if (s.pinEnabled && /^\d{4}$/.test(s.pinCode) && !isPinSessionUnlocked()) setPhase("pin");
+      else setPhase("main");
+    });
+  };
+
+  const handlePinSuccess = () => setPhase("main");
+
+  if (phase === "splash") {
     return (
       <div className="min-h-screen bg-[#0d9668] flex items-center justify-center">
         <div className="text-center space-y-3">
@@ -39,32 +62,36 @@ export default function App() {
     );
   }
 
-  // First run — no nav, full screen
-  if (!ready) {
-    return (
-      <BrowserRouter>
-        <FirstRun onComplete={() => setReady(true)} />
-      </BrowserRouter>
-    );
-  }
-
   return (
-    <BrowserRouter>
+    <LanguageProvider>
       <Toaster position="top-center" richColors />
-      <Routes>
-        <Route element={<Layout />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/customers" element={<Customers />} />
-          <Route path="/customers/:id" element={<CustomerLedger />} />
-          <Route path="/new-transaction" element={<NewTransaction />} />
-          <Route path="/transactions" element={<TransactionHistory />} />
-          <Route path="/products" element={<Products />} />
-          <Route path="/sale" element={<SaleReceipt />} />
-          <Route path="/reports" element={<Reports />} />
-          <Route path="/daily-close" element={<DailyClose />} />
-          <Route path="/settings" element={<SettingsPage />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+      {phase === "first_run" ? (
+        <BrowserRouter>
+          <FirstRun onComplete={handleFirstRunComplete} />
+        </BrowserRouter>
+      ) : phase === "pin" && settings && /^\d{4}$/.test(settings.pinCode) ? (
+        <PinLock expectedPin={settings.pinCode} onSuccess={handlePinSuccess} />
+      ) : (
+        <BrowserRouter>
+          <Routes>
+            <Route element={<Layout />}>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/customers" element={<Customers />} />
+              <Route path="/customers/:id" element={<CustomerLedger />} />
+              <Route path="/suppliers" element={<Suppliers />} />
+              <Route path="/suppliers/:id" element={<SupplierLedger />} />
+              <Route path="/new-transaction" element={<NewTransaction />} />
+              <Route path="/transactions" element={<TransactionHistory />} />
+              <Route path="/products" element={<Products />} />
+              <Route path="/sale" element={<SaleReceipt />} />
+              <Route path="/reports" element={<Reports />} />
+              <Route path="/daily-close" element={<DailyClose />} />
+              <Route path="/settings" element={<SettingsPage />} />
+            </Route>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      )}
+    </LanguageProvider>
   );
 }

@@ -8,16 +8,18 @@ import {
   getCustomers, addTransaction, getCustomerBalance, getProducts,
   updateProductStock, getCustomer, initSettings,
 } from "@/lib/db";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { Customer, Product, Settings } from "@/types";
 
 interface CartItem { product: Product; qty: number; unitPrice: number; }
 interface SavedUdhar { customer: Customer; items: CartItem[]; total: number; date: string; receiptNo: string; }
 
 export default function NewTransaction() {
+  const { shopType, t } = useLanguage();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [mode, setMode] = useState<"credit" | "payment">(searchParams.get("type") === "payment" ? "payment" : "credit");
@@ -29,6 +31,7 @@ export default function NewTransaction() {
   const [customerId, setCustomerId]           = useState(searchParams.get("customer") || "");
   const [customerSearch, setCustomerSearch]   = useState("");
   const [showCustomerPicker, setShowCustomerPicker] = useState(false);
+  const [pickerBalances, setPickerBalances]   = useState<Record<string, number>>({});
   const [selectedCustomer, setSelectedCustomer]     = useState<Customer | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
   const [date, setDate]       = useState(new Date().toISOString().split("T")[0]);
@@ -68,6 +71,17 @@ export default function NewTransaction() {
     if (customerId) getCustomerBalance(customerId).then(setBalance);
     else setBalance(null);
   }, [customerId]);
+
+  useEffect(() => {
+    if (!showCustomerPicker || customers.length === 0) return;
+    let cancelled = false;
+    setPickerBalances({});
+    Promise.all(customers.map(c => getCustomerBalance(c.id).then(b => [c.id, b] as const)))
+      .then(entries => {
+        if (!cancelled) setPickerBalances(Object.fromEntries(entries));
+      });
+    return () => { cancelled = true; };
+  }, [showCustomerPicker, customers]);
 
   const cartTotal = cart.reduce((s, i) => s + i.qty * i.unitPrice, 0);
 
@@ -153,7 +167,7 @@ export default function NewTransaction() {
       {/* Print-only receipt */}
       {savedUdhar && (
         <div className="receipt-print-area hidden print:block">
-          <div style={{ fontFamily: "monospace", fontSize: "12px", width: "80mm", margin: "0 auto", padding: "4mm" }}>
+          <div className="receipt-58" style={{ fontFamily: "monospace", fontSize: "12px", width: "80mm", margin: "0 auto", padding: "4mm" }}>
             <div style={{ textAlign: "center", marginBottom: "8px" }}>
               <div style={{ fontSize: "16px", fontWeight: "bold" }}>{shopName}</div>
               <div style={{ fontSize: "10px", marginTop: "2px" }}>{new Date(savedUdhar.date).toLocaleDateString("en-PK", { day: "2-digit", month: "short", year: "numeric" })}</div>
@@ -214,12 +228,30 @@ export default function NewTransaction() {
               <div className="max-h-64 overflow-y-auto">
                 {filteredCustomers.length === 0
                   ? <p className="text-sm text-muted-foreground text-center py-8">No customers found</p>
-                  : filteredCustomers.map(c => (
-                    <button key={c.id} onClick={() => selectCustomer(c)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted text-left transition">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold shrink-0">{c.name.charAt(0)}</div>
-                      <div><p className="text-sm font-medium text-card-foreground">{c.name}</p>{c.phone && <p className="text-xs text-muted-foreground">{c.phone}</p>}</div>
-                    </button>
-                  ))
+                  : filteredCustomers.map(c => {
+                    const b = pickerBalances[c.id];
+                    return (
+                      <button key={c.id} onClick={() => selectCustomer(c)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted text-left transition">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold shrink-0">{c.name.charAt(0)}</div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-card-foreground truncate">{c.name}</p>
+                          {c.phone && <p className="text-xs text-muted-foreground truncate">{c.phone}</p>}
+                        </div>
+                        {b !== undefined && (
+                          <span
+                            className={cn(
+                              "shrink-0 text-xs font-mono font-semibold tabular-nums text-right max-w-[42%]",
+                              b > 0 && "text-destructive",
+                              b < 0 && "text-success",
+                              b === 0 && "text-muted-foreground",
+                            )}
+                          >
+                            {b > 0 ? `${formatCurrency(b)} due` : b < 0 ? `${formatCurrency(Math.abs(b))} adv` : "Settled"}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })
                 }
               </div>
               <div className="p-3 border-t border-border">
@@ -314,10 +346,12 @@ export default function NewTransaction() {
           <>
             {/* Add toolbar */}
             <div className="flex gap-2">
-              <button onClick={() => setShowScanner(true)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:opacity-90 transition shrink-0">
-                <Scan className="w-4 h-4" /> Scan
-              </button>
+              {shopType !== "kiryana" && (
+                <button onClick={() => setShowScanner(true)}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:opacity-90 transition shrink-0">
+                  <Scan className="w-4 h-4" /> {t("scan")}
+                </button>
+              )}
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input type="text" placeholder="Search products to add..."

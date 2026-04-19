@@ -1,60 +1,79 @@
 import { Outlet, NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Users, PlusCircle, History, BarChart3, Settings,
-  Menu, X, Package, Moon, Sun, ShoppingCart, ClipboardCheck, BookOpen,
+  Menu, X, Package, Moon, Sun, ShoppingCart, ClipboardCheck, Truck,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { initSettings, db } from "@/lib/db";
+import { db, initSettings } from "@/lib/db";
+import { useLanguage } from "@/contexts/LanguageContext";
+import type { StringKey } from "@/lib/i18n";
 
-// ─── Kiryana mode: simple khata-focused nav ───────────────────────────────────
-const karyanaNav = [
-  { to: "/", icon: LayoutDashboard, label: "Home" },
-  { to: "/customers", icon: Users, label: "Customers" },
-  { to: "/new-transaction", icon: PlusCircle, label: "Udhar / Wapsi" },
-  { to: "/daily-close", icon: ClipboardCheck, label: "Daily Close" },
-  { to: "/settings", icon: Settings, label: "Settings" },
+interface NavItem { to: string; icon: any; labelKey: StringKey; primary?: boolean; }
+
+// ─── Kiryana mode: simple khata-focused nav (no products, no POS, no scan) ──
+const karyanaNav: NavItem[] = [
+  { to: "/",                icon: LayoutDashboard, labelKey: "nav_home" },
+  { to: "/customers",       icon: Users,           labelKey: "nav_customers" },
+  { to: "/suppliers",       icon: Truck,           labelKey: "nav_suppliers" },
+  { to: "/new-transaction", icon: PlusCircle,      labelKey: "nav_udhar_wapsi" },
+  { to: "/daily-close",     icon: ClipboardCheck,  labelKey: "nav_daily_close" },
+  { to: "/settings",        icon: Settings,        labelKey: "nav_settings" },
 ];
-const karyanaBottomNav = [
-  { to: "/", icon: LayoutDashboard, label: "Home" },
-  { to: "/customers", icon: Users, label: "Customers" },
-  { to: "/new-transaction", icon: PlusCircle, label: "Udhar", primary: true },
-  { to: "/daily-close", icon: ClipboardCheck, label: "Close" },
-  { to: "/settings", icon: Settings, label: "Settings" },
+const karyanaBottomNav: NavItem[] = [
+  { to: "/",                icon: LayoutDashboard, labelKey: "nav_home" },
+  { to: "/customers",       icon: Users,           labelKey: "nav_customers" },
+  { to: "/new-transaction", icon: PlusCircle,      labelKey: "nav_udhar", primary: true },
+  { to: "/daily-close",     icon: ClipboardCheck,  labelKey: "nav_close" },
+  { to: "/settings",        icon: Settings,        labelKey: "nav_settings" },
 ];
 
-// ─── Pro mode: full nav ────────────────────────────────────────────────────────
-const proNav = [
-  { to: "/", icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/customers", icon: Users, label: "Customers" },
-  { to: "/products", icon: Package, label: "Products" },
-  { to: "/new-transaction", icon: PlusCircle, label: "New Entry" },
-  { to: "/sale", icon: ShoppingCart, label: "POS / Sale" },
-  { to: "/transactions", icon: History, label: "History" },
-  { to: "/reports", icon: BarChart3, label: "Reports" },
-  { to: "/daily-close", icon: ClipboardCheck, label: "Daily Close" },
-  { to: "/settings", icon: Settings, label: "Settings" },
+// ─── Pro mode: full nav ─────────────────────────────────────────────────────
+const proNav: NavItem[] = [
+  { to: "/",                icon: LayoutDashboard, labelKey: "nav_dashboard" },
+  { to: "/customers",       icon: Users,           labelKey: "nav_customers" },
+  { to: "/suppliers",       icon: Truck,           labelKey: "nav_suppliers" },
+  { to: "/products",        icon: Package,         labelKey: "nav_products" },
+  { to: "/new-transaction", icon: PlusCircle,      labelKey: "nav_new_entry" },
+  { to: "/sale",            icon: ShoppingCart,    labelKey: "nav_pos" },
+  { to: "/transactions",    icon: History,         labelKey: "nav_history" },
+  { to: "/reports",         icon: BarChart3,       labelKey: "nav_reports" },
+  { to: "/daily-close",     icon: ClipboardCheck,  labelKey: "nav_daily_close" },
+  { to: "/settings",        icon: Settings,        labelKey: "nav_settings" },
 ];
-const proBottomNav = [
-  { to: "/", icon: LayoutDashboard, label: "Home" },
-  { to: "/customers", icon: Users, label: "Customers" },
-  { to: "/new-transaction", icon: PlusCircle, label: "Entry", primary: true },
-  { to: "/sale", icon: ShoppingCart, label: "POS" },
-  { to: "/daily-close", icon: ClipboardCheck, label: "Close" },
+const proBottomNav: NavItem[] = [
+  { to: "/",                icon: LayoutDashboard, labelKey: "nav_home" },
+  { to: "/customers",       icon: Users,           labelKey: "nav_customers" },
+  { to: "/new-transaction", icon: PlusCircle,      labelKey: "nav_entry", primary: true },
+  { to: "/sale",            icon: ShoppingCart,    labelKey: "nav_pos" },
+  { to: "/daily-close",     icon: ClipboardCheck,  labelKey: "nav_close" },
 ];
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [darkMode, setDarkMode]       = useState(false);
-  const [shopType, setShopType]       = useState<"kiryana" | "pro">("pro");
+  const [online, setOnline]           = useState(() => (typeof navigator !== "undefined" ? navigator.onLine : true));
+  const { t, shopType, isUrdu } = useLanguage();
   const location = useLocation();
 
   useEffect(() => {
     initSettings().then(s => {
       if (s.darkMode) { setDarkMode(true); document.documentElement.classList.add("dark"); }
-      if (s.shopType === "kiryana" || s.shopType === "pro") setShopType(s.shopType);
     });
+  }, []);
+
+  useEffect(() => {
+    const sync = () => setOnline(navigator.onLine);
+    const onOnline = () => setOnline(true);
+    const onOffline = () => setOnline(false);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    sync();
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
   }, []);
 
   const toggleDark = async () => {
@@ -66,13 +85,18 @@ export default function Layout() {
 
   const navItems       = shopType === "kiryana" ? karyanaNav : proNav;
   const bottomNavItems = shopType === "kiryana" ? karyanaBottomNav : proBottomNav;
-  const appName        = shopType === "kiryana" ? "Bahi" : "Bahi Pro";
-  const appSub         = shopType === "kiryana" ? "Kiryana Khata" : "Dukan Management";
+  const appName        = t("app_name");
+  const appSub         = shopType === "kiryana" ? t("app_tagline_kiryana") : t("app_tagline_pro");
 
   const currentPage = navItems.find(n => {
     if (n.to === "/") return location.pathname === "/";
     return location.pathname.startsWith(n.to);
-  })?.label ?? (location.pathname.startsWith("/customers/") ? "Customer Ledger" : "Bahi");
+  });
+  const currentLabel = currentPage
+    ? t(currentPage.labelKey)
+    : location.pathname.startsWith("/customers/") ? t("nav_customers")
+    : location.pathname.startsWith("/suppliers/") ? t("nav_suppliers")
+    : t("app_name");
 
   const SidebarBrand = () => (
     <div className="flex items-center gap-3">
@@ -86,13 +110,22 @@ export default function Layout() {
       </div>
       <div>
         <h1 className="font-display font-bold text-base tracking-tight">{appName}</h1>
-        <p className="text-[10px] text-sidebar-foreground/50 tracking-wide uppercase">{appSub}</p>
+        <p className={cn("text-[10px] text-sidebar-foreground/50 tracking-wide", !isUrdu && "uppercase")}>{appSub}</p>
       </div>
     </div>
   );
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-screen flex-col overflow-hidden bg-background">
+      {!online && (
+        <div
+          role="status"
+          className="shrink-0 w-full border-b border-amber-600/25 bg-amber-400 px-4 py-2 text-center text-sm font-medium text-amber-950 dark:border-amber-400/30 dark:bg-amber-500 dark:text-amber-950"
+        >
+          Offline mode — data saves locally
+        </div>
+      )}
+      <div className="flex min-h-0 flex-1 overflow-hidden">
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex flex-col w-[240px] bg-sidebar text-sidebar-foreground shrink-0">
         <div className="flex items-center gap-3 px-5 py-5 border-b border-sidebar-accent">
@@ -108,12 +141,12 @@ export default function Layout() {
                   : "text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
               )}>
               <item.icon className="w-[18px] h-[18px] shrink-0" />
-              {item.label}
+              {t(item.labelKey)}
             </NavLink>
           ))}
         </nav>
         <div className="px-4 py-3 border-t border-sidebar-accent flex items-center justify-between">
-          <p className="text-[11px] text-sidebar-foreground/40">Offline Ready · PWA</p>
+          <p className="text-[11px] text-sidebar-foreground/40">{t("offline_footer")}</p>
           <button onClick={toggleDark} className="p-1.5 rounded-lg hover:bg-sidebar-accent transition text-sidebar-foreground/60">
             {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
@@ -128,9 +161,12 @@ export default function Layout() {
               className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
               onClick={() => setSidebarOpen(false)} />
             <motion.aside
-              initial={{ x: -280 }} animate={{ x: 0 }} exit={{ x: -280 }}
+              initial={{ x: isUrdu ? 280 : -280 }} animate={{ x: 0 }} exit={{ x: isUrdu ? 280 : -280 }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="fixed inset-y-0 left-0 z-50 w-[240px] bg-sidebar text-sidebar-foreground lg:hidden flex flex-col"
+              className={cn(
+                "fixed inset-y-0 z-50 w-[240px] bg-sidebar text-sidebar-foreground lg:hidden flex flex-col",
+                isUrdu ? "right-0" : "left-0"
+              )}
             >
               <div className="flex items-center justify-between px-5 py-5 border-b border-sidebar-accent">
                 <SidebarBrand />
@@ -147,7 +183,7 @@ export default function Layout() {
                       isActive ? "bg-primary/15 text-primary" : "text-sidebar-foreground/60 hover:bg-sidebar-accent/60"
                     )}>
                     <item.icon className="w-[18px] h-[18px]" />
-                    {item.label}
+                    {t(item.labelKey)}
                   </NavLink>
                 ))}
               </nav>
@@ -163,7 +199,7 @@ export default function Layout() {
             <button className="lg:hidden p-1.5 rounded-lg hover:bg-muted transition shrink-0" onClick={() => setSidebarOpen(true)}>
               <Menu className="w-5 h-5 text-foreground" />
             </button>
-            <h2 className="font-display font-semibold text-base text-foreground truncate">{currentPage}</h2>
+            <h2 className="font-display font-semibold text-base text-foreground truncate">{currentLabel}</h2>
           </div>
           <button onClick={toggleDark} className="lg:hidden p-2 rounded-lg hover:bg-muted transition shrink-0">
             {darkMode ? <Sun className="w-5 h-5 text-foreground" /> : <Moon className="w-5 h-5 text-foreground" />}
@@ -186,11 +222,12 @@ export default function Layout() {
                     : isActive ? "text-primary" : "text-muted-foreground"
                 )}>
                 <item.icon className="w-[18px] h-[18px] shrink-0" />
-                <span className="truncate leading-tight">{item.label}</span>
+                <span className="truncate leading-tight">{t(item.labelKey)}</span>
               </NavLink>
             ))}
           </div>
         </nav>
+      </div>
       </div>
     </div>
   );

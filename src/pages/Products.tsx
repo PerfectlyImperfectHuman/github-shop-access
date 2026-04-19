@@ -1,11 +1,14 @@
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Plus, Search, Package, Edit2, Trash2, AlertTriangle, ToggleLeft, ToggleRight, X, Scan } from "lucide-react";
-import { getProducts, addProduct, updateProduct, deleteProduct } from "@/lib/db";
+import { useLiveQuery } from "dexie-react-hooks";
+import { db, addProduct, updateProduct, deleteProduct } from "@/lib/db";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import { SelectField } from "@/components/ui/select-field";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { Product } from "@/types";
 
 const CATEGORIES = ["General", "Grocery", "Electronics", "Clothing", "Hardware", "Medicine", "Stationery", "Other"];
@@ -17,23 +20,21 @@ const UNIT_OPTIONS = UNITS.map(u => ({ value: u, label: u }));
 const emptyForm = { name: "", category: "General", sku: "", price: 0, costPrice: 0, stock: 0, unit: "pcs", minStock: 5 };
 
 export default function Products() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const { t } = useLanguage();
+  const productsRaw = useLiveQuery(() => db.products.toArray(), []);
+  const products = useMemo(() => {
+    const all = [...(productsRaw ?? [])];
+    all.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return all;
+  }, [productsRaw]);
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState("");
   const [form, setForm] = useState(emptyForm);
-  const [loading, setLoading] = useState(true);
+  const loading = productsRaw === undefined;
   const [showScanner, setShowScanner] = useState(false);
-
-  async function load() {
-    const all = await getProducts();
-    all.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    setProducts(all);
-    setLoading(false);
-  }
-
-  useEffect(() => { load(); }, []);
+  const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
 
   const filtered = products.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase());
@@ -53,7 +54,6 @@ export default function Products() {
       toast.success("Product added");
     }
     closeForm();
-    load();
   }
 
   function closeForm() {
@@ -77,14 +77,13 @@ export default function Products() {
   async function toggleActive(p: Product) {
     await updateProduct(p.id, { isActive: !p.isActive });
     toast.success(p.isActive ? "Product deactivated" : "Product activated");
-    load();
   }
 
-  async function handleDelete(p: Product) {
-    if (!confirm(`Delete "${p.name}"? This cannot be undone.`)) return;
-    await deleteProduct(p.id);
+  async function confirmDeleteProduct() {
+    if (!deleteTarget) return;
+    await deleteProduct(deleteTarget.id);
     toast.success("Product deleted");
-    load();
+    setDeleteTarget(null);
   }
 
   // Barcode scan on the Products page:
@@ -110,7 +109,7 @@ export default function Products() {
 
   const lowStock = products.filter(p => p.isActive && p.stock <= p.minStock);
   const totalValue = products.filter(p => p.isActive).reduce((s, p) => s + p.price * p.stock, 0);
-  const filterCategoryOptions = [{ value: "", label: "All Categories" }, ...CATEGORY_OPTIONS];
+  const filterCategoryOptions = [{ value: "", label: t("category") }, ...CATEGORY_OPTIONS];
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -122,10 +121,10 @@ export default function Products() {
       {/* Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Total Products", value: products.length, color: "text-card-foreground" },
-          { label: "Active", value: products.filter(p => p.isActive).length, color: "text-success" },
-          { label: "Low Stock", value: lowStock.length, color: "text-warning" },
-          { label: "Inventory Value", value: formatCurrency(totalValue), color: "text-primary" },
+          { label: t("nav_products"), value: products.length, color: "text-card-foreground" },
+          { label: t("active"), value: products.filter(p => p.isActive).length, color: "text-success" },
+          { label: t("low_stock"), value: lowStock.length, color: "text-warning" },
+          { label: t("total"), value: formatCurrency(totalValue), color: "text-primary" },
         ].map(s => (
           <div key={s.label} className="bg-card rounded-xl border border-border p-3 shadow-sm">
             <p className="text-xs text-muted-foreground">{s.label}</p>
@@ -171,7 +170,7 @@ export default function Products() {
           </button>
           <button onClick={() => openNewForm()}
             className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition whitespace-nowrap">
-            <Plus className="w-4 h-4" /> Add Product
+            <Plus className="w-4 h-4" /> {t("add_product")}
           </button>
         </div>
       </div>
@@ -307,7 +306,7 @@ export default function Products() {
                     <button onClick={() => toggleActive(p)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition" title={p.isActive ? "Deactivate" : "Activate"}>
                       {p.isActive ? <ToggleRight className="w-4 h-4 text-success" /> : <ToggleLeft className="w-4 h-4" />}
                     </button>
-                    <button onClick={() => handleDelete(p)} className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition" title="Delete">
+                    <button onClick={() => setDeleteTarget(p)} className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition" title="Delete">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -317,6 +316,16 @@ export default function Products() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={o => { if (!o) setDeleteTarget(null); }}
+        title={t("delete")}
+        description={deleteTarget ? `Delete "${deleteTarget.name}"? This cannot be undone.` : ""}
+        confirmLabel={t("delete")}
+        cancelLabel={t("cancel")}
+        onConfirm={confirmDeleteProduct}
+      />
     </div>
   );
 }

@@ -12,6 +12,18 @@ export interface Customer {
   updatedAt: string;
 }
 
+export interface Supplier {
+  id: string;
+  name: string;
+  phone: string;
+  address: string;
+  notes: string;
+  isActive: boolean;
+  openingBalance: number; // amount we owe at start (positive = we owe them)
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -27,15 +39,28 @@ export interface Product {
   updatedAt: string;
 }
 
+export type TransactionType = "credit" | "payment" | "sale" | "purchase" | "supplier_payment";
+
 export interface Transaction {
   id: string;
-  customerId: string;
-  type: "credit" | "payment" | "sale";
+  customerId: string;          // empty for supplier txns and pure cash sales
+  supplierId?: string;         // set when partyType === "supplier"
+  partyType?: "customer" | "supplier"; // defaults to "customer" for legacy data
+  type: TransactionType;
   amount: number;
   description: string;
   date: string;
   productId?: string;
   quantity?: number;
+  createdAt: string;
+}
+
+export interface Expense {
+  id: string;
+  date: string;
+  category: string;            // bijli, pani, safai, kiraya, transport, other
+  amount: number;
+  note: string;
   createdAt: string;
 }
 
@@ -48,10 +73,15 @@ export interface Settings {
   address: string;
   autoBackup: boolean;
   darkMode: boolean;
-  language: string;
+  language: "en" | "ur";
   taxRate: number;
   receiptFooter: string;
   shopType: "kiryana" | "pro" | "";
+  printerWidth: "58mm" | "80mm";
+  /** When true and pinCode is 4 digits, show PIN gate until sessionStorage unlock. */
+  pinEnabled: boolean;
+  /** Four-digit PIN (digits only). Empty when lock disabled or not yet set. */
+  pinCode: string;
 }
 
 export interface DailySummary {
@@ -59,7 +89,13 @@ export interface DailySummary {
   cashSales: number;
   creditGiven: number;
   paymentsReceived: number;
+  purchases: number;            // ulta udhar received from suppliers
+  supplierPayments: number;     // money paid to suppliers
+  expenses: number;             // daily expenses
   salesCount: number;
   creditCount: number;
   paymentCount: number;
+  purchaseCount: number;
+  supplierPaymentCount: number;
+  expenseCount: number;
 }

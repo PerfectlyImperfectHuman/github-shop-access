@@ -1,44 +1,53 @@
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Plus, Search, Phone, MapPin, Edit2, ToggleLeft, ToggleRight, ChevronRight, Trash2, AlertCircle, MessageCircle, X, UserPlus } from "lucide-react";
-import { getCustomers, addCustomer, updateCustomer, deleteCustomer, getCustomerBalance } from "@/lib/db";
-import { formatCurrency, daysAgo } from "@/lib/utils";
+import { useLiveQuery } from "dexie-react-hooks";
+import { db, addCustomer, updateCustomer, deleteCustomer } from "@/lib/db";
+import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { SelectField } from "@/components/ui/select-field";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { Customer } from "@/types";
 
 interface CustomerWithBalance extends Customer { balance: number; }
 
 const emptyForm = { name: "", phone: "", address: "", notes: "", cnic: "", email: "", creditLimit: 0 };
 
-const filterOptions = [
-  { value: "all", label: "All Customers" },
-  { value: "active", label: "Active Only" },
-  { value: "inactive", label: "Inactive Only" },
-  { value: "overdue", label: "Over Credit Limit" },
-  { value: "balance", label: "Has Outstanding Balance" },
-];
 
 export default function Customers() {
-  const [customers, setCustomers] = useState<CustomerWithBalance[]>([]);
+  const { t } = useLanguage();
+  const customersRaw = useLiveQuery(() => db.customers.toArray(), []);
+  const transactionsRaw = useLiveQuery(() => db.transactions.toArray(), []);
+  const customers = useMemo((): CustomerWithBalance[] => {
+    const list = customersRaw ?? [];
+    const txns = transactionsRaw ?? [];
+    const balById: Record<string, number> = {};
+    for (const tr of txns) {
+      if (!tr.customerId) continue;
+      if (tr.type === "credit") balById[tr.customerId] = (balById[tr.customerId] ?? 0) + tr.amount;
+      else if (tr.type === "payment") balById[tr.customerId] = (balById[tr.customerId] ?? 0) - tr.amount;
+    }
+    return list.map(c => ({ ...c, balance: balById[c.id] ?? 0 }));
+  }, [customersRaw, transactionsRaw]);
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
-  const [loading, setLoading] = useState(true);
+  const loading = customersRaw === undefined || transactionsRaw === undefined;
   const [filterStatus, setFilterStatus] = useState("all");
   const [sortBy, setSortBy] = useState("newest");
+  const [deleteTarget, setDeleteTarget] = useState<CustomerWithBalance | null>(null);
   const navigate = useNavigate();
 
-  async function load() {
-    const all = await getCustomers();
-    const withBal = await Promise.all(all.map(async c => ({ ...c, balance: await getCustomerBalance(c.id) })));
-    setCustomers(withBal);
-    setLoading(false);
-  }
-
-  useEffect(() => { load(); }, []);
+  const filterOptions = [
+    { value: "all", label: t("filter_all") },
+    { value: "active", label: t("filter_active") },
+    { value: "inactive", label: t("filter_inactive") },
+    { value: "overdue", label: t("filter_overdue") },
+    { value: "balance", label: t("filter_with_balance") },
+  ];
 
   const sorted = [...customers].sort((a, b) => {
     if (sortBy === "newest") return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
@@ -60,16 +69,15 @@ export default function Customers() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.name.trim()) { toast.error("Customer name is required"); return; }
+    if (!form.name.trim()) { toast.error(t("customer_name") + " " + t("required")); return; }
     if (editingId) {
       await updateCustomer(editingId, { ...form, creditLimit: Number(form.creditLimit) || 0 });
-      toast.success("Customer updated");
+      toast.success(t("customer_updated"));
     } else {
       await addCustomer({ ...form, isActive: true, creditLimit: Number(form.creditLimit) || 0 });
-      toast.success("Customer added");
+      toast.success(t("customer_added"));
     }
     closeForm();
-    load();
   }
 
   function closeForm() {
@@ -92,19 +100,18 @@ export default function Customers() {
 
   async function toggleActive(c: Customer) {
     await updateCustomer(c.id, { isActive: !c.isActive });
-    toast.success(c.isActive ? "Customer deactivated" : "Customer activated");
-    load();
+    toast.success(c.isActive ? t("customer_updated") : t("customer_updated"));
   }
 
-  async function handleDelete(c: CustomerWithBalance) {
-    if (!confirm(`Delete "${c.name}" and all their transactions? This cannot be undone.`)) return;
-    await deleteCustomer(c.id);
-    toast.success("Customer deleted");
-    load();
+  async function confirmDeleteCustomer() {
+    if (!deleteTarget) return;
+    await deleteCustomer(deleteTarget.id);
+    toast.success(t("customer_deleted"));
+    setDeleteTarget(null);
   }
 
   function openWhatsApp(c: Customer, balance: number) {
-    if (!c.phone) { toast.error("No phone number saved"); return; }
+    if (!c.phone) { toast.error(t("no_phone_saved")); return; }
     const digits = c.phone.replace(/\D/g, "");
     const intl = digits.startsWith("0") ? "92" + digits.slice(1) : digits.startsWith("92") ? digits : "92" + digits;
     const balMsg = balance > 0
@@ -122,9 +129,9 @@ export default function Customers() {
 
   const totalOutstanding = customers.reduce((sum, c) => sum + Math.max(0, c.balance), 0);
   const sortOptions = [
-    { value: "newest", label: "Newest First" },
-    { value: "balance", label: "Highest Balance" },
-    { value: "name", label: "Name A–Z" },
+    { value: "newest", label: t("sort_newest") },
+    { value: "balance", label: t("sort_balance") },
+    { value: "name", label: t("sort_name") },
   ];
 
   return (
@@ -132,10 +139,10 @@ export default function Customers() {
       {/* Summary Bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Total", value: customers.length, color: "text-card-foreground" },
-          { label: "Active", value: customers.filter(c => c.isActive).length, color: "text-success" },
-          { label: "With Balance", value: customers.filter(c => c.balance > 0).length, color: "text-warning" },
-          { label: "Outstanding", value: formatCurrency(totalOutstanding), color: "text-destructive" },
+          { label: t("total_customers"), value: customers.length, color: "text-card-foreground" },
+          { label: t("active"), value: customers.filter(c => c.isActive).length, color: "text-success" },
+          { label: t("with_balance"), value: customers.filter(c => c.balance > 0).length, color: "text-warning" },
+          { label: t("outstanding"), value: formatCurrency(totalOutstanding), color: "text-destructive" },
         ].map(s => (
           <div key={s.label} className="bg-card rounded-xl border border-border p-3 shadow-sm">
             <p className="text-xs text-muted-foreground">{s.label}</p>
@@ -148,7 +155,7 @@ export default function Customers() {
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div className="relative flex-1 max-w-sm w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input type="text" placeholder="Search name, phone, CNIC..." value={search} onChange={e => setSearch(e.target.value)}
+          <input type="text" placeholder={t("search_customer_placeholder")} value={search} onChange={e => setSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-input bg-card text-card-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
@@ -160,7 +167,7 @@ export default function Customers() {
           </div>
           <button onClick={openNewForm}
             className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition whitespace-nowrap shrink-0">
-            <Plus className="w-4 h-4" /> Add
+            <Plus className="w-4 h-4" /> {t("add")}
           </button>
         </div>
       </div>
@@ -175,7 +182,7 @@ export default function Customers() {
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-display font-semibold text-card-foreground flex items-center gap-2">
               <UserPlus className="w-4 h-4 text-primary" />
-              {editingId ? "Edit Customer" : "New Customer"}
+              {editingId ? t("edit_customer") : t("new_customer")}
             </h3>
             <button type="button" onClick={closeForm} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground">
               <X className="w-4 h-4" />
@@ -183,7 +190,7 @@ export default function Customers() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Name *</label>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">{t("customer_name")} *</label>
               <input placeholder="Customer name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                 className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring" required autoFocus />
             </div>
@@ -215,10 +222,10 @@ export default function Customers() {
           </div>
           <div className="flex gap-3 mt-4">
             <button type="submit" className="px-5 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition">
-              {editingId ? "Update Customer" : "Add Customer"}
+              {editingId ? t("save") : t("add")}
             </button>
             <button type="button" onClick={closeForm} className="px-5 py-2.5 bg-secondary text-secondary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition">
-              Cancel
+              {t("cancel")}
             </button>
           </div>
         </motion.form>
@@ -227,9 +234,9 @@ export default function Customers() {
       {/* Customer List */}
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-border flex items-center justify-between">
-          <h3 className="font-display font-semibold text-sm text-card-foreground">{filtered.length} Customer{filtered.length !== 1 ? "s" : ""}</h3>
+          <h3 className="font-display font-semibold text-sm text-card-foreground">{filtered.length} {t("nav_customers")}</h3>
           {(search || filterStatus !== "all") && (
-            <button onClick={() => { setSearch(""); setFilterStatus("all"); }} className="text-xs text-primary hover:underline">Clear filters</button>
+            <button onClick={() => { setSearch(""); setFilterStatus("all"); }} className="text-xs text-primary hover:underline">{t("clear_filters")}</button>
           )}
         </div>
         {filtered.length === 0 ? (
@@ -238,11 +245,11 @@ export default function Customers() {
               <UserPlus className="w-6 h-6 text-muted-foreground/50" />
             </div>
             <p className="font-medium text-muted-foreground">
-              {customers.length === 0 ? "No customers yet" : "No customers match your search"}
+              {customers.length === 0 ? t("no_customers_yet") : t("no_customers_match")}
             </p>
             {customers.length === 0 && (
               <button onClick={openNewForm} className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition">
-                Add First Customer
+                {t("add_first_customer")}
               </button>
             )}
           </div>
@@ -301,7 +308,7 @@ export default function Customers() {
                     <button onClick={e => { e.stopPropagation(); toggleActive(c); }} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition hidden sm:flex" title={c.isActive ? "Deactivate" : "Activate"}>
                       {c.isActive ? <ToggleRight className="w-4 h-4 text-success" /> : <ToggleLeft className="w-4 h-4" />}
                     </button>
-                    <button onClick={e => { e.stopPropagation(); handleDelete(c); }} className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition" title="Delete">
+                    <button onClick={e => { e.stopPropagation(); setDeleteTarget(c); }} className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition" title="Delete">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                     <ChevronRight className="w-4 h-4 text-muted-foreground/30 cursor-pointer" onClick={() => navigate(`/customers/${c.id}`)} />
@@ -312,6 +319,16 @@ export default function Customers() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={o => { if (!o) setDeleteTarget(null); }}
+        title={t("delete")}
+        description={deleteTarget ? t("delete_customer_confirm") : ""}
+        confirmLabel={t("delete")}
+        cancelLabel={t("cancel")}
+        onConfirm={confirmDeleteCustomer}
+      />
     </div>
   );
 }
