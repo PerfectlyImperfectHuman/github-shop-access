@@ -4,6 +4,7 @@ import { BarChart3, Users, TrendingUp, TrendingDown, Percent, ChevronRight } fro
 import { getCustomers, getTransactions, getCustomerBalance } from "@/lib/db";
 import { formatCurrency } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { Customer, Transaction } from "@/types";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -13,6 +14,7 @@ import {
 const COLORS = { credit: "#e24b4a", payment: "#1d9e75", outstanding: "#ba7517", recovered: "#1d9e75" };
 
 export default function Reports() {
+  const { t } = useLanguage();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [topDebtors, setTopDebtors] = useState<{ name: string; balance: number; id: string }[]>([]);
@@ -39,8 +41,8 @@ export default function Reports() {
   const recoveryRate = totalCredit > 0 ? ((totalPayments / totalCredit) * 100).toFixed(1) : "0";
 
   const pieData = [
-    { name: "Collected", value: totalPayments },
-    { name: "Outstanding", value: outstanding },
+    { name: t("collected"), value: totalPayments },
+    { name: t("outstanding"), value: outstanding },
   ];
 
   // Monthly data (last 6 months)
@@ -74,10 +76,10 @@ export default function Reports() {
       {/* Summary Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Total Credit", val: formatCurrency(totalCredit), icon: TrendingUp, cls: "text-destructive", bg: "bg-destructive/10" },
-          { label: "Total Payments", val: formatCurrency(totalPayments), icon: TrendingDown, cls: "text-success", bg: "bg-success/10" },
-          { label: "Outstanding", val: formatCurrency(outstanding), icon: BarChart3, cls: "text-warning", bg: "bg-warning/10" },
-          { label: "Recovery Rate", val: `${recoveryRate}%`, icon: Percent, cls: "text-primary", bg: "bg-primary/10" },
+          { label: t("total_credit_full"), val: formatCurrency(totalCredit), icon: TrendingUp, cls: "text-destructive", bg: "bg-destructive/10" },
+          { label: t("total_payments_full"), val: formatCurrency(totalPayments), icon: TrendingDown, cls: "text-success", bg: "bg-success/10" },
+          { label: t("outstanding"), val: formatCurrency(outstanding), icon: BarChart3, cls: "text-warning", bg: "bg-warning/10" },
+          { label: t("recovery_rate"), val: `${recoveryRate}%`, icon: Percent, cls: "text-primary", bg: "bg-primary/10" },
         ].map((c, i) => (
           <motion.div key={c.label} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}
             className="bg-card rounded-xl border border-border p-4 shadow-sm">
@@ -95,17 +97,17 @@ export default function Reports() {
       {transactions.length === 0 ? (
         <div className="text-center py-16 bg-card rounded-xl border border-border">
           <BarChart3 className="w-12 h-12 mx-auto mb-3 text-muted-foreground/30" />
-          <p className="font-medium text-muted-foreground">No data to show yet</p>
-          <p className="text-xs text-muted-foreground mt-1">Start adding customers and transactions to see your reports</p>
+          <p className="font-medium text-muted-foreground">{t("no_data_yet")}</p>
+          <p className="text-xs text-muted-foreground mt-1">{t("start_adding_help")}</p>
           <button onClick={() => navigate("/new-transaction")} className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition">
-            Record First Transaction
+            {t("record_first_entry")}
           </button>
         </div>
       ) : (
         <>
           {/* 14-Day Trend */}
           <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
-            <h3 className="font-display font-semibold text-sm text-card-foreground mb-4">14-Day Trend</h3>
+            <h3 className="font-display font-semibold text-sm text-card-foreground mb-4">{t("fourteen_day_trend")}</h3>
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={lineData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 89%)" />
@@ -123,7 +125,7 @@ export default function Reports() {
             {/* Monthly Bar Chart */}
             {barData.length > 0 && (
               <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
-                <h3 className="font-display font-semibold text-sm text-card-foreground mb-4">Monthly Overview</h3>
+                <h3 className="font-display font-semibold text-sm text-card-foreground mb-4">{t("monthly_overview")}</h3>
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={barData} barGap={4}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 89%)" />
@@ -141,7 +143,7 @@ export default function Reports() {
             {/* Pie Chart */}
             {totalCredit > 0 && (
               <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
-                <h3 className="font-display font-semibold text-sm text-card-foreground mb-4">Collection Status</h3>
+                <h3 className="font-display font-semibold text-sm text-card-foreground mb-4">{t("collection_status")}</h3>
                 <ResponsiveContainer width="100%" height={200}>
                   <PieChart>
                     <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="value"
@@ -154,8 +156,8 @@ export default function Reports() {
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="flex items-center justify-center gap-4 mt-2">
-                  <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[#1d9e75]" /><span className="text-xs text-muted-foreground">Collected</span></div>
-                  <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[#e24b4a]" /><span className="text-xs text-muted-foreground">Outstanding</span></div>
+                  <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[#1d9e75]" /><span className="text-xs text-muted-foreground">{t("collected")}</span></div>
+                  <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[#e24b4a]" /><span className="text-xs text-muted-foreground">{t("outstanding")}</span></div>
                 </div>
               </div>
             )}
@@ -166,7 +168,7 @@ export default function Reports() {
             <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
               <div className="px-5 py-3 border-b border-border flex items-center gap-2">
                 <Users className="w-4 h-4 text-muted-foreground" />
-                <h3 className="font-display font-semibold text-sm text-card-foreground">Top Outstanding Balances</h3>
+                <h3 className="font-display font-semibold text-sm text-card-foreground">{t("top_outstanding")}</h3>
               </div>
               <div className="divide-y divide-border">
                 {topDebtors.map((d, i) => {
