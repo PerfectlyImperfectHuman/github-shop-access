@@ -268,6 +268,7 @@ const en = {
   version_footer: "Bahi v3.0 • Made for Pakistan 🇵🇰",
   offline_footer: "Offline-first • No internet required",
 
+<<<<<<< HEAD
   // PIN lock
   pin_lock_title: "App locked",
   pin_enter: "Enter your 4-digit PIN",
@@ -283,6 +284,8 @@ const en = {
   pin_set_hint: "Enter the same PIN twice. It is saved when you tap Save settings.",
   pin_ready_save: "PIN ready — tap Save settings below to store it.",
 
+=======
+>>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
   // History
   search_history_placeholder: "Search name or description...",
   all_customers: "All Customers",
@@ -560,6 +563,7 @@ const ur: Record<keyof typeof en, string> = {
   version_footer: "بہی v3.0 • پاکستان کے لیے 🇵🇰",
   offline_footer: "آف لائن • انٹرنیٹ کی ضرورت نہیں",
 
+<<<<<<< HEAD
   pin_lock_title: "ایپ لاک ہے",
   pin_enter: "اپنا 4 ہندسوں والا PIN درج کریں",
   pin_wrong: "غلط PIN۔ دوبارہ کوشش کریں۔",
@@ -574,6 +578,8 @@ const ur: Record<keyof typeof en, string> = {
   pin_set_hint: "ایک جیسا PIN دو بار درج کریں؛ محفوظ کرنے کے لیے Save دبائیں۔",
   pin_ready_save: "PIN تیار ہے — نیچے Save دبا کر محفوظ کریں۔",
 
+=======
+>>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
   search_history_placeholder: "نام یا تفصیل تلاش کریں...",
   all_customers: "تمام گاہک",
   all_types: "تمام اقسام",

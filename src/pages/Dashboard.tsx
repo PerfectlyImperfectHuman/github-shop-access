@@ -1,9 +1,14 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
+<<<<<<< HEAD
 import { liveQuery } from "dexie";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Users, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Package, AlertTriangle, Wallet, CalendarDays, Truck } from "lucide-react";
 import { db, getDashboardStats } from "@/lib/db";
+=======
+import { Users, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Package, AlertTriangle, Wallet, CalendarDays, Truck } from "lucide-react";
+import { getDashboardStats, getTransactions, getCustomer, initSettings } from "@/lib/db";
+>>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { useT, useLanguage } from "@/contexts/LanguageContext";
@@ -14,6 +19,7 @@ interface EnrichedTransaction extends Transaction { customerName?: string; }
 export default function Dashboard() {
   const t = useT();
   const { shopType } = useLanguage();
+<<<<<<< HEAD
   const stats = useLiveQuery(() => liveQuery(async () => getDashboardStats()), []);
   const settingsRow = useLiveQuery(() => db.settings.get("default"), []);
   const recent = useLiveQuery(
@@ -35,6 +41,35 @@ export default function Dashboard() {
   const loading = stats === undefined || recent === undefined || settingsRow === undefined;
   const navigate = useNavigate();
 
+=======
+  const [stats, setStats] = useState({
+    totalCustomers: 0, activeCustomers: 0, totalCredit: 0, totalPayments: 0,
+    outstandingBalance: 0, supplierOutstanding: 0, todayCredit: 0, todayPayments: 0,
+    weekCredit: 0, weekPayments: 0, lowStockProducts: 0, totalSuppliers: 0,
+  });
+  const [recent, setRecent] = useState<EnrichedTransaction[]>([]);
+  const [shopName, setShopName] = useState("My Shop");
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    async function load() {
+      const [s, txns, settings] = await Promise.all([getDashboardStats(), getTransactions(), initSettings()]);
+      setStats(s as any);
+      setShopName(settings.shopName);
+      const enriched = await Promise.all(
+        txns.slice(0, 10).map(async (tt) => {
+          const c = tt.customerId ? await getCustomer(tt.customerId) : undefined;
+          return { ...tt, customerName: c?.name || "—" };
+        })
+      );
+      setRecent(enriched);
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+>>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
   if (loading) {
     return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" /></div>;
   }

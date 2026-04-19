@@ -1,13 +1,23 @@
+<<<<<<< HEAD
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Plus, Search, Phone, Edit2, Trash2, ChevronRight, X, Truck } from "lucide-react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, addSupplier, updateSupplier, deleteSupplier } from "@/lib/db";
+=======
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import { Plus, Search, Phone, Edit2, Trash2, ChevronRight, X, Truck } from "lucide-react";
+import { getSuppliers, addSupplier, updateSupplier, deleteSupplier, getSupplierBalance } from "@/lib/db";
+>>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { useT } from "@/contexts/LanguageContext";
+<<<<<<< HEAD
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+=======
+>>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
 import type { Supplier } from "@/types";
 
 interface SupplierWithBalance extends Supplier { balance: number; }
@@ -17,6 +27,7 @@ const emptyForm = { name: "", phone: "", address: "", notes: "", openingBalance:
 export default function Suppliers() {
   const t = useT();
   const navigate = useNavigate();
+<<<<<<< HEAD
   const suppliersRaw = useLiveQuery(() => db.suppliers.toArray(), []);
   const transactionsRaw = useLiveQuery(() => db.transactions.toArray(), []);
   const suppliers = useMemo((): SupplierWithBalance[] => {
@@ -34,12 +45,28 @@ export default function Suppliers() {
       return { ...s, balance: bal };
     });
   }, [suppliersRaw, transactionsRaw]);
+=======
+  const [suppliers, setSuppliers] = useState<SupplierWithBalance[]>([]);
+>>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
+<<<<<<< HEAD
   const loading = suppliersRaw === undefined || transactionsRaw === undefined;
   const [deleteTarget, setDeleteTarget] = useState<SupplierWithBalance | null>(null);
+=======
+  const [loading, setLoading] = useState(true);
+
+  async function load() {
+    const all = await getSuppliers();
+    const withBal = await Promise.all(all.map(async s => ({ ...s, balance: await getSupplierBalance(s.id) })));
+    setSuppliers(withBal);
+    setLoading(false);
+  }
+
+  useEffect(() => { load(); }, []);
+>>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
 
   const filtered = suppliers.filter(s => {
     const q = search.toLowerCase();
@@ -57,6 +84,10 @@ export default function Suppliers() {
       toast.success(t("supplier_added"));
     }
     closeForm();
+<<<<<<< HEAD
+=======
+    load();
+>>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
   }
 
   function closeForm() { setShowForm(false); setEditingId(null); setForm(emptyForm); }
@@ -67,11 +98,19 @@ export default function Suppliers() {
     setShowForm(true);
   }
 
+<<<<<<< HEAD
   async function confirmDeleteSupplier() {
     if (!deleteTarget) return;
     await deleteSupplier(deleteTarget.id);
     toast.success(t("supplier_deleted"));
     setDeleteTarget(null);
+=======
+  async function handleDelete(s: SupplierWithBalance) {
+    if (!confirm(t("delete_supplier_confirm"))) return;
+    await deleteSupplier(s.id);
+    toast.success(t("supplier_deleted"));
+    load();
+>>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
   }
 
   if (loading) {
@@ -187,7 +226,11 @@ export default function Suppliers() {
                   <button onClick={e => { e.stopPropagation(); startEdit(s); }} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition">
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
+<<<<<<< HEAD
                   <button onClick={e => { e.stopPropagation(); setDeleteTarget(s); }} className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition">
+=======
+                  <button onClick={e => { e.stopPropagation(); handleDelete(s); }} className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition">
+>>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                   <ChevronRight className="w-4 h-4 text-muted-foreground/30 cursor-pointer" onClick={() => navigate(`/suppliers/${s.id}`)} />
@@ -197,6 +240,7 @@ export default function Suppliers() {
           </div>
         )}
       </div>
+<<<<<<< HEAD
 
       <ConfirmDialog
         open={deleteTarget !== null}
@@ -207,6 +251,8 @@ export default function Suppliers() {
         cancelLabel={t("cancel")}
         onConfirm={confirmDeleteSupplier}
       />
+=======
+>>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
     </div>
   );
 }

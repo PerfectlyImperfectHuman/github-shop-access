@@ -6,7 +6,10 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { SelectField } from "@/components/ui/select-field";
+<<<<<<< HEAD
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+=======
+>>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
 import { useLanguage } from "@/contexts/LanguageContext";
 import type { Transaction, Customer } from "@/types";
 
@@ -14,6 +17,7 @@ interface EnrichedTransaction extends Transaction { customerName: string; }
 
 export default function TransactionHistory() {
   const { t } = useLanguage();
+<<<<<<< HEAD
   const txnsRaw = useLiveQuery(() => db.transactions.orderBy("date").reverse().toArray(), []);
   const customersRaw = useLiveQuery(() => db.customers.toArray(), []);
   const transactions = useMemo((): EnrichedTransaction[] => {
@@ -26,6 +30,10 @@ export default function TransactionHistory() {
     }));
   }, [txnsRaw, customersRaw]);
   const customers = customersRaw ?? [];
+=======
+  const [transactions, setTransactions] = useState<EnrichedTransaction[]>([]);
+  const [customers, setCustomers]       = useState<Customer[]>([]);
+>>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
   const [filterCustomer, setFilterCustomer] = useState("");
   const [filterType, setFilterType]         = useState("");
   const [dateFrom, setDateFrom]             = useState("");
@@ -35,11 +43,34 @@ export default function TransactionHistory() {
   const [deleteTxnId, setDeleteTxnId]       = useState<string | null>(null);
   const navigate = useNavigate();
 
+<<<<<<< HEAD
   const filtered = transactions.filter(txn => {
     if (filterCustomer && txn.customerId !== filterCustomer) return false;
     if (filterType && txn.type !== filterType) return false;
     if (dateFrom && new Date(txn.date) < new Date(dateFrom)) return false;
     if (dateTo   && new Date(txn.date) > new Date(dateTo + "T23:59:59")) return false;
+=======
+  async function load() {
+    const [txns, custs] = await Promise.all([getTransactions(), getCustomers()]);
+    setCustomers(custs);
+    const enriched = await Promise.all(
+      txns.map(async t => {
+        const c = await getCustomer(t.customerId);
+        return { ...t, customerName: c?.name || (t.type === "sale" ? "Cash Sale" : "—") };
+      })
+    );
+    setTransactions(enriched);
+    setLoading(false);
+  }
+
+  useEffect(() => { load(); }, []);
+
+  const filtered = transactions.filter(t => {
+    if (filterCustomer && t.customerId !== filterCustomer) return false;
+    if (filterType && t.type !== filterType) return false;
+    if (dateFrom && new Date(t.date) < new Date(dateFrom)) return false;
+    if (dateTo   && new Date(t.date) > new Date(dateTo + "T23:59:59")) return false;
+>>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
     if (search) {
       const q = search.toLowerCase();
       if (!txn.customerName.toLowerCase().includes(q) && !(txn.description || "").toLowerCase().includes(q)) return false;
@@ -52,11 +83,19 @@ export default function TransactionHistory() {
   const totalSales   = filtered.filter(txn => txn.type === "sale").reduce((s, txn) => s + txn.amount, 0);
   const hasFilters   = filterCustomer || filterType || dateFrom || dateTo || search;
 
+<<<<<<< HEAD
   async function confirmDeleteTransaction() {
     if (!deleteTxnId) return;
     await deleteTransaction(deleteTxnId);
     toast.success(t("txn_deleted"));
     setDeleteTxnId(null);
+=======
+  async function handleDelete(id: string) {
+    if (!confirm(t("delete_txn_confirm"))) return;
+    await deleteTransaction(id);
+    toast.success(t("txn_deleted"));
+    load();
+>>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
   }
 
   function clearFilters() {
@@ -83,9 +122,15 @@ export default function TransactionHistory() {
       {/* Summary */}
       <div className="grid grid-cols-3 gap-2">
         {[
+<<<<<<< HEAD
           { label: t("udhar_credit"),    val: totalCredit,  sub: `${filtered.filter(txn => txn.type === "credit").length}`,  cls: "text-destructive" },
           { label: t("payment_wapsi"),   val: totalPayment, sub: `${filtered.filter(txn => txn.type === "payment").length}`, cls: "text-success" },
           { label: t("cash_sale"),       val: totalSales,   sub: `${filtered.filter(txn => txn.type === "sale").length}`,    cls: "text-primary" },
+=======
+          { label: t("udhar_credit"),    val: totalCredit,  sub: `${filtered.filter(t => t.type === "credit").length}`,  cls: "text-destructive" },
+          { label: t("payment_wapsi"),   val: totalPayment, sub: `${filtered.filter(t => t.type === "payment").length}`, cls: "text-success" },
+          { label: t("cash_sale"),       val: totalSales,   sub: `${filtered.filter(t => t.type === "sale").length}`,    cls: "text-primary" },
+>>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
         ].map(s => (
           <div key={s.label} className="bg-card rounded-xl border border-border p-3 shadow-sm">
             <p className="text-xs text-muted-foreground">{s.label}</p>

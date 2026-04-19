@@ -8,7 +8,10 @@ import { db, deleteTransaction } from "@/lib/db";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import { toast } from "sonner";
 import { useLanguage } from "@/contexts/LanguageContext";
+<<<<<<< HEAD
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+=======
+>>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
 import type { Customer, Transaction } from "@/types";
 
 interface LedgerRow extends Transaction { runningBalance: number; }
@@ -40,11 +43,30 @@ export default function CustomerLedger() {
   const loading = !id || ledger === undefined;
   const [deleteTxnId, setDeleteTxnId] = useState<string | null>(null);
 
+<<<<<<< HEAD
   async function confirmDeleteTransaction() {
     if (!deleteTxnId) return;
     await deleteTransaction(deleteTxnId);
     toast.success(t("txn_deleted"));
     setDeleteTxnId(null);
+=======
+  async function load() {
+    if (!id) return;
+    const [c, txns, bal] = await Promise.all([getCustomer(id), getTransactions(id), getCustomerBalance(id)]);
+    if (c) setCustomer(c);
+    setTransactions(txns);
+    setBalance(bal);
+    setLoading(false);
+  }
+
+  useEffect(() => { load(); }, [id]);
+
+  async function handleDeleteTransaction(txnId: string) {
+    if (!confirm(t("delete_txn_confirm"))) return;
+    await deleteTransaction(txnId);
+    toast.success(t("txn_deleted"));
+    load();
+>>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
   }
 
   function handlePrint() { window.print(); }

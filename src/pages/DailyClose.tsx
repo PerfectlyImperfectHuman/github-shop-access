@@ -4,9 +4,16 @@ import {
   Printer, ChevronLeft, ChevronRight, TrendingUp, TrendingDown,
   Wallet, ClipboardCheck, RefreshCw, MessageCircle, Plus, X, Trash2, Receipt,
 } from "lucide-react";
+<<<<<<< HEAD
 import { liveQuery } from "dexie";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, getDailySummary, addExpense, deleteExpense } from "@/lib/db";
+=======
+import {
+  getDailySummary, initSettings, getTransactions, getCustomer,
+  getExpensesByDate, addExpense, deleteExpense,
+} from "@/lib/db";
+>>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
 import { formatCurrency, shareOnWhatsApp } from "@/lib/utils";
 import { toast } from "sonner";
 import { useT, useLanguage } from "@/contexts/LanguageContext";
@@ -21,6 +28,7 @@ export default function DailyClose() {
   const today = new Date().toISOString().split("T")[0];
 
   const [date, setDate] = useState(today);
+<<<<<<< HEAD
   const [refreshTick, setRefreshTick] = useState(0);
   const summary = useLiveQuery(
     () => liveQuery(async () => {
@@ -50,6 +58,16 @@ export default function DailyClose() {
     const custs = settingsRow ? undefined : undefined;
     return list;
   }, [allTxns, date, settingsRow]);
+=======
+  const [summary, setSummary] = useState<DailySummary | null>(null);
+  const [transactions, setTransactions] = useState<EnrichedTxn[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [shopName, setShopName] = useState("My Shop");
+  const [shopPhone, setShopPhone] = useState("");
+  const [receiptFooter, setReceiptFooter] = useState("Thank you!");
+  const [loading, setLoading] = useState(true);
+  const [openingCash, setOpeningCash] = useState("");
+>>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
   const openingCashKey = `openingCash:${date}`;
 
   // Expense form
@@ -78,7 +96,11 @@ export default function DailyClose() {
     const dayStart = new Date(date); dayStart.setHours(0, 0, 0, 0);
     const dayEnd   = new Date(date); dayEnd.setHours(23, 59, 59, 999);
     const allTxns  = await getTransactions();
+<<<<<<< HEAD
     const dayTxns  = allTxns.filter(txn => { const d = new Date(txn.date); return d >= dayStart && d <= dayEnd; });
+=======
+    const dayTxns  = allTxns.filter(t => { const d = new Date(t.date); return d >= dayStart && d <= dayEnd; });
+>>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
     const enriched = await Promise.all(dayTxns.map(async tt => {
       const c = tt.customerId ? await getCustomer(tt.customerId) : undefined;
       return { ...tt, customerName: c?.name };

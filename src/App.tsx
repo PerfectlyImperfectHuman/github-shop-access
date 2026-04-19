@@ -15,6 +15,7 @@ import DailyClose from "./pages/DailyClose";
 import FirstRun from "./pages/FirstRun";
 import Suppliers from "./pages/Suppliers";
 import SupplierLedger from "./pages/SupplierLedger";
+<<<<<<< HEAD
 import PinLock from "./pages/PinLock";
 import { initSettings } from "./lib/db";
 import { isPinSessionUnlocked } from "./lib/pinSession";
@@ -22,6 +23,10 @@ import { LanguageProvider } from "./contexts/LanguageContext";
 import type { Settings } from "./types";
 
 type BootPhase = "splash" | "first_run" | "pin" | "main";
+=======
+import { initSettings } from "./lib/db";
+import { LanguageProvider } from "./contexts/LanguageContext";
+>>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
 
 export default function App() {
   const [phase, setPhase] = useState<BootPhase>("splash");
@@ -64,6 +69,7 @@ export default function App() {
 
   return (
     <LanguageProvider>
+<<<<<<< HEAD
       <Toaster position="top-center" richColors />
       {phase === "first_run" ? (
         <BrowserRouter>
@@ -92,6 +98,27 @@ export default function App() {
           </Routes>
         </BrowserRouter>
       )}
+=======
+      <BrowserRouter>
+        <Toaster position="top-center" richColors />
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/customers" element={<Customers />} />
+            <Route path="/customers/:id" element={<CustomerLedger />} />
+            <Route path="/suppliers" element={<Suppliers />} />
+            <Route path="/suppliers/:id" element={<SupplierLedger />} />
+            <Route path="/new-transaction" element={<NewTransaction />} />
+            <Route path="/transactions" element={<TransactionHistory />} />
+            <Route path="/products" element={<Products />} />
+            <Route path="/sale" element={<SaleReceipt />} />
+            <Route path="/reports" element={<Reports />} />
+            <Route path="/daily-close" element={<DailyClose />} />
+            <Route path="/settings" element={<SettingsPage />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+>>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
     </LanguageProvider>
   );
 }
