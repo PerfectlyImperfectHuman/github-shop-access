@@ -22,6 +22,11 @@ import { LanguageProvider } from "./contexts/LanguageContext";
 import type { Settings } from "./types";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { setupAutoBackup } from "./lib/cloudBackup";
+import Cheques from "./pages/Cheques";
+import {
+  requestNotificationPermission,
+  checkAndNotifyLowStock,
+} from "./lib/notifications";
 
 type BootPhase = "splash" | "first_run" | "pin" | "main";
 
@@ -43,6 +48,10 @@ export default function App() {
       else setPhase("main");
     });
   }, []);
+
+  requestNotificationPermission().then((granted) => {
+    if (granted) setTimeout(checkAndNotifyLowStock, 3000);
+  });
 
   const handleFirstRunComplete = () => {
     initSettings().then((s) => {
@@ -123,6 +132,7 @@ export default function App() {
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/daily-close" element={<DailyClose />} />
                 <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/cheques" element={<Cheques />} />
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

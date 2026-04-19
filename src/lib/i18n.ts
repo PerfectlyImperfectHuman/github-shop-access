@@ -61,6 +61,7 @@ const en = {
   nav_close: "Close",
   nav_entry: "Entry",
   nav_udhar: "Udhar",
+  nav_cheques: "Cheques",
 
   // Dashboard
   shop_overview: "Overview",
@@ -80,8 +81,8 @@ const en = {
   add_first_entry_help: "Add a customer and record your first entry",
   record_first_entry: "Record First Entry",
   low_stock: "low stock",
-  i_will_receive: "Mujhe lena hai",     // money owed TO me
-  i_will_pay: "Mujhe dena hai",          // money I owe (suppliers)
+  i_will_receive: "Mujhe lena hai", // money owed TO me
+  i_will_pay: "Mujhe dena hai", // money I owe (suppliers)
   active_count: "active",
 
   // Customers
@@ -217,7 +218,8 @@ const en = {
   total_payments_full: "Total Payments",
   recovery_rate: "Recovery Rate",
   no_data_yet: "No data to show yet",
-  start_adding_help: "Start adding customers and transactions to see your reports",
+  start_adding_help:
+    "Start adding customers and transactions to see your reports",
   fourteen_day_trend: "14-Day Trend",
   monthly_overview: "Monthly Overview",
   collection_status: "Collection Status",
@@ -252,15 +254,20 @@ const en = {
   printer_58mm_desc: "Most common — 3,000–4,000 PKR printers",
   printer_80mm_desc: "Wider receipts for larger printers",
   data_backup: "Data Backup & Restore",
-  data_backup_desc: "All data is stored on this device only. Export regularly to avoid data loss.",
+  data_backup_desc:
+    "All data is stored on this device only. Export regularly to avoid data loss.",
   export_backup: "Export Backup (JSON)",
   import_backup: "Import Backup",
-  import_warning: "Importing will replace all existing data. Always export a backup first.",
+  import_warning:
+    "Importing will replace all existing data. Always export a backup first.",
   danger_zone: "Danger Zone",
-  danger_zone_desc: "Permanently delete all customers, transactions, and products. Cannot be undone.",
+  danger_zone_desc:
+    "Permanently delete all customers, transactions, and products. Cannot be undone.",
   clear_all_data: "Clear All Data",
-  clear_warning_1: "⚠ WARNING: This will DELETE ALL your data (customers, transactions, products). This CANNOT be undone!\n\nAre you absolutely sure?",
-  clear_warning_2: "Last confirmation — all data will be permanently deleted. Continue?",
+  clear_warning_1:
+    "⚠ WARNING: This will DELETE ALL your data (customers, transactions, products). This CANNOT be undone!\n\nAre you absolutely sure?",
+  clear_warning_2:
+    "Last confirmation — all data will be permanently deleted. Continue?",
   all_data_cleared: "All data cleared",
   backup_downloaded: "Backup downloaded successfully",
   invalid_backup: "Invalid backup file. Please check the file and try again.",
@@ -273,14 +280,18 @@ const en = {
   pin_enter: "Enter your 4-digit PIN",
   pin_wrong: "Wrong PIN. Try again.",
   pin_section_title: "App PIN lock",
-  pin_section_desc: "Ask for a PIN once per browser tab. Data still stays on this device only.",
+  pin_section_desc:
+    "Ask for a PIN once per browser tab. Data still stays on this device only.",
   pin_require_lock: "Require PIN when opening app",
-  pin_require_lock_hint: "Set a 4-digit PIN below, then enable this and save settings.",
+  pin_require_lock_hint:
+    "Set a 4-digit PIN below, then enable this and save settings.",
   pin_create_title: "Create PIN",
   pin_confirm_title: "Confirm PIN",
-  pin_enable_needs_pin: "Enter and confirm a 4-digit PIN before enabling the lock.",
+  pin_enable_needs_pin:
+    "Enter and confirm a 4-digit PIN before enabling the lock.",
   pin_mismatch: "PINs did not match. Try again.",
-  pin_set_hint: "Enter the same PIN twice. It is saved when you tap Save settings.",
+  pin_set_hint:
+    "Enter the same PIN twice. It is saved when you tap Save settings.",
   pin_ready_save: "PIN ready — tap Save settings below to store it.",
 
   // History
@@ -361,6 +372,7 @@ const ur: Record<keyof typeof en, string> = {
   nav_close: "کلوز",
   nav_entry: "انٹری",
   nav_udhar: "ادھار",
+  nav_cheques: "چیک",
 
   shop_overview: "جائزہ",
   todays_credit: "آج کا ادھار",
@@ -544,14 +556,18 @@ const ur: Record<keyof typeof en, string> = {
   printer_58mm_desc: "سب سے عام — 3,000–4,000 روپے کے پرنٹر",
   printer_80mm_desc: "بڑے پرنٹر کے لیے چوڑی رسید",
   data_backup: "ڈیٹا بیک اپ اور بحالی",
-  data_backup_desc: "تمام ڈیٹا صرف اس ڈیوائس پر محفوظ ہے۔ ڈیٹا کھونے سے بچنے کے لیے باقاعدہ ایکسپورٹ کریں۔",
+  data_backup_desc:
+    "تمام ڈیٹا صرف اس ڈیوائس پر محفوظ ہے۔ ڈیٹا کھونے سے بچنے کے لیے باقاعدہ ایکسپورٹ کریں۔",
   export_backup: "بیک اپ ایکسپورٹ کریں",
   import_backup: "بیک اپ امپورٹ کریں",
-  import_warning: "امپورٹ کرنے سے پرانا ڈیٹا بدل جائے گا۔ پہلے بیک اپ ضرور لیں۔",
+  import_warning:
+    "امپورٹ کرنے سے پرانا ڈیٹا بدل جائے گا۔ پہلے بیک اپ ضرور لیں۔",
   danger_zone: "خطرے کا زون",
-  danger_zone_desc: "تمام گاہک، لین دین، اور اشیاء حذف کریں۔ یہ واپس نہیں ہو گا۔",
+  danger_zone_desc:
+    "تمام گاہک، لین دین، اور اشیاء حذف کریں۔ یہ واپس نہیں ہو گا۔",
   clear_all_data: "سب ڈیٹا حذف کریں",
-  clear_warning_1: "⚠ خبردار: یہ آپ کا تمام ڈیٹا (گاہک، لین دین، اشیاء) حذف کر دے گا۔ یہ واپس نہیں ہو گا!\n\nکیا آپ واقعی یقین رکھتے ہیں؟",
+  clear_warning_1:
+    "⚠ خبردار: یہ آپ کا تمام ڈیٹا (گاہک، لین دین، اشیاء) حذف کر دے گا۔ یہ واپس نہیں ہو گا!\n\nکیا آپ واقعی یقین رکھتے ہیں؟",
   clear_warning_2: "آخری تصدیق — تمام ڈیٹا مستقل حذف ہو جائے گا۔ جاری رکھیں؟",
   all_data_cleared: "تمام ڈیٹا حذف ہو گیا",
   backup_downloaded: "بیک اپ ڈاؤن لوڈ ہو گیا",
@@ -564,9 +580,11 @@ const ur: Record<keyof typeof en, string> = {
   pin_enter: "اپنا 4 ہندسوں والا PIN درج کریں",
   pin_wrong: "غلط PIN۔ دوبارہ کوشش کریں۔",
   pin_section_title: "ایپ PIN لاک",
-  pin_section_desc: "ہر براؤزر ٹیب میں ایک بار PIN۔ ڈیٹا صرف اس ڈیوائس پر رہتا ہے۔",
+  pin_section_desc:
+    "ہر براؤزر ٹیب میں ایک بار PIN۔ ڈیٹا صرف اس ڈیوائس پر رہتا ہے۔",
   pin_require_lock: "ایپ کھولتے وقت PIN ضروری",
-  pin_require_lock_hint: "نیچے 4 ہندسوں والا PIN بنائیں، پھر یہ آن کر کے سیٹنگز محفوظ کریں۔",
+  pin_require_lock_hint:
+    "نیچے 4 ہندسوں والا PIN بنائیں، پھر یہ آن کر کے سیٹنگز محفوظ کریں۔",
   pin_create_title: "PIN بنائیں",
   pin_confirm_title: "PIN کی تصدیق",
   pin_enable_needs_pin: "لاک سے پہلے PIN درج اور تصدیق کریں۔",
