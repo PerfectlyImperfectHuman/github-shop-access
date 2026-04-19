@@ -378,7 +378,8 @@ export default function DailyClose() {
             {/* Action buttons */}
             <div className="grid grid-cols-2 gap-3">
               <button onClick={sendWhatsApp}
-                className="flex items-center justify-center gap-2 py-3.5 bg-green-600 text-white rounded-xl font-semibold text-sm hover:opacity-90 transition">
+                style={{ backgroundColor: "#25D366", color: "white" }}
+                className="flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold text-sm hover:opacity-90 transition">
                 <MessageCircle className="w-4 h-4" /> {t("whatsapp_summary")}
               </button>
               <button onClick={() => window.print()}

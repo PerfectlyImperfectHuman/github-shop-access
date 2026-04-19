@@ -12,12 +12,14 @@ import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { Customer, Product, Settings } from "@/types";
 
 interface CartItem { product: Product; qty: number; unitPrice: number; }
 interface SavedUdhar { customer: Customer; items: CartItem[]; total: number; date: string; receiptNo: string; }
 
 export default function NewTransaction() {
+  const { shopType } = useLanguage();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [mode, setMode] = useState<"credit" | "payment">(searchParams.get("type") === "payment" ? "payment" : "credit");
