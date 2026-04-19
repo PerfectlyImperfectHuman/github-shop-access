@@ -21,16 +21,12 @@ const emptyForm = { name: "", category: "General", sku: "", price: 0, costPrice:
 
 export default function Products() {
   const { t } = useLanguage();
-<<<<<<< HEAD
   const productsRaw = useLiveQuery(() => db.products.toArray(), []);
   const products = useMemo(() => {
     const all = [...(productsRaw ?? [])];
     all.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return all;
   }, [productsRaw]);
-=======
-  const [products, setProducts] = useState<Product[]>([]);
->>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);

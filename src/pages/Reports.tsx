@@ -16,7 +16,6 @@ const COLORS = { credit: "#e24b4a", payment: "#1d9e75", outstanding: "#ba7517", 
 
 export default function Reports() {
   const { t } = useLanguage();
-<<<<<<< HEAD
   const customersRaw = useLiveQuery(() => db.customers.toArray(), []);
   const transactionsRaw = useLiveQuery(() => db.transactions.toArray(), []);
   const customers = customersRaw ?? [];
@@ -35,12 +34,6 @@ export default function Reports() {
       .slice(0, 10);
   }, [customers, transactions]);
   const loading = customersRaw === undefined || transactionsRaw === undefined;
-=======
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [topDebtors, setTopDebtors] = useState<{ name: string; balance: number; id: string }[]>([]);
-  const [loading, setLoading] = useState(true);
->>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
   const navigate = useNavigate();
 
   const totalCredit = transactions.filter(txn => txn.type === "credit").reduce((s, txn) => s + txn.amount, 0);

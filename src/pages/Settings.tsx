@@ -1,10 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
-<<<<<<< HEAD
 import { Save, Download, Upload, Store, Shield, Moon, Sun, Info, Database, Palette, Languages, Printer, Check, Lock } from "lucide-react";
-=======
-import { Save, Download, Upload, Store, Shield, Moon, Sun, Info, Database, Palette, Languages, Printer, Check } from "lucide-react";
->>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
 import { initSettings, exportData, importData, db } from "@/lib/db";
 import { clearPinSession } from "@/lib/pinSession";
 import { PinNumpad, PinDots } from "@/pages/PinLock";
@@ -101,23 +97,14 @@ export default function SettingsPage() {
     input.click();
   }
 
-<<<<<<< HEAD
   async function executeClearAll() {
-=======
-  async function handleClearAll() {
-    if (!confirm(t("clear_warning_1"))) return;
-    if (!confirm(t("clear_warning_2"))) return;
->>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
     await db.customers.clear();
     await db.transactions.clear();
     await db.products.clear();
     await db.suppliers.clear();
     await db.expenses.clear();
     toast.success(t("all_data_cleared"));
-<<<<<<< HEAD
     setClearStep(0);
-=======
->>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
     setTimeout(() => window.location.reload(), 1000);
   }
 
@@ -345,17 +332,12 @@ export default function SettingsPage() {
           <h3 className="font-display font-semibold text-destructive">{t("danger_zone")}</h3>
         </div>
         <p className="text-xs text-muted-foreground mb-4 ml-11">{t("danger_zone_desc")}</p>
-<<<<<<< HEAD
         <button type="button" onClick={() => setClearStep(1)}
-=======
-        <button onClick={handleClearAll}
->>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
           className="flex items-center justify-center gap-2 px-5 py-2.5 bg-destructive text-destructive-foreground rounded-lg text-sm font-medium hover:opacity-90 transition">
           {t("clear_all_data")}
         </button>
       </div>
 
-<<<<<<< HEAD
       <ConfirmDialog
         open={clearStep === 1}
         onOpenChange={o => { if (!o) setClearStep(0); }}
@@ -376,8 +358,6 @@ export default function SettingsPage() {
         onConfirm={() => void executeClearAll()}
       />
 
-=======
->>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
       <div className="text-center py-2">
         <p className="text-xs text-muted-foreground">{t("version_footer")}</p>
         <p className="text-xs text-muted-foreground mt-0.5">{t("offline_footer")}</p>

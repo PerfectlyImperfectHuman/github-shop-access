@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -10,16 +9,6 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 import { useT } from "@/contexts/LanguageContext";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-=======
-import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
-import { ArrowLeft, Phone, ShoppingBag, DollarSign, Trash2, Plus, X, Truck } from "lucide-react";
-import { getSupplier, getSupplierTransactions, getSupplierBalance, addTransaction, deleteTransaction } from "@/lib/db";
-import { formatCurrency, formatDate } from "@/lib/utils";
-import { toast } from "sonner";
-import { useT } from "@/contexts/LanguageContext";
->>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
 import type { Supplier, Transaction } from "@/types";
 
 interface LedgerRow extends Transaction { runningBalance: number; }
@@ -28,7 +17,6 @@ export default function SupplierLedger() {
   const t = useT();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-<<<<<<< HEAD
   const bundle = useLiveQuery(
     () => liveQuery(async () => {
       if (!id) return { supplier: null as Supplier | null, transactions: [] as Transaction[], balance: 0 };
@@ -49,12 +37,6 @@ export default function SupplierLedger() {
   const transactions = bundle?.transactions ?? [];
   const balance = bundle?.balance ?? 0;
   const loading = !id || bundle === undefined;
-=======
-  const [supplier, setSupplier] = useState<Supplier | null>(null);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [balance, setBalance] = useState(0);
-  const [loading, setLoading] = useState(true);
->>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
 
   const [mode, setMode] = useState<"purchase" | "supplier_payment">("purchase");
   const [amount, setAmount] = useState("");
@@ -62,21 +44,7 @@ export default function SupplierLedger() {
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-<<<<<<< HEAD
   const [deleteTxnId, setDeleteTxnId] = useState<string | null>(null);
-=======
-
-  async function load() {
-    if (!id) return;
-    const [s, txns, bal] = await Promise.all([getSupplier(id), getSupplierTransactions(id), getSupplierBalance(id)]);
-    if (s) setSupplier(s);
-    setTransactions(txns);
-    setBalance(bal);
-    setLoading(false);
-  }
-
-  useEffect(() => { load(); }, [id]);
->>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -96,27 +64,15 @@ export default function SupplierLedger() {
       });
       toast.success(mode === "purchase" ? t("purchase_recorded") : t("supplier_payment_recorded"));
       setAmount(""); setDesc(""); setShowForm(false);
-<<<<<<< HEAD
-=======
-      load();
->>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
     } catch { toast.error("Error"); }
     finally { setSubmitting(false); }
   }
 
-<<<<<<< HEAD
   async function confirmDeleteTransaction() {
     if (!deleteTxnId) return;
     await deleteTransaction(deleteTxnId);
     toast.success(t("txn_deleted"));
     setDeleteTxnId(null);
-=======
-  async function handleDelete(txnId: string) {
-    if (!confirm(t("delete_txn_confirm"))) return;
-    await deleteTransaction(txnId);
-    toast.success(t("txn_deleted"));
-    load();
->>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
   }
 
   if (loading) {
@@ -254,11 +210,7 @@ export default function SupplierLedger() {
                       {formatCurrency(Math.abs(row.runningBalance))}
                     </td>
                     <td className="px-3 py-2.5">
-<<<<<<< HEAD
                       <button onClick={() => setDeleteTxnId(row.id)}
-=======
-                      <button onClick={() => handleDelete(row.id)}
->>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
                         className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -270,7 +222,6 @@ export default function SupplierLedger() {
           </div>
         )}
       </div>
-<<<<<<< HEAD
 
       <ConfirmDialog
         open={deleteTxnId !== null}
@@ -281,8 +232,6 @@ export default function SupplierLedger() {
         cancelLabel={t("cancel")}
         onConfirm={confirmDeleteTransaction}
       />
-=======
->>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
     </div>
   );
 }

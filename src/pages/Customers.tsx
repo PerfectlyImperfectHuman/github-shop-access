@@ -7,10 +7,7 @@ import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { SelectField } from "@/components/ui/select-field";
-<<<<<<< HEAD
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-=======
->>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
 import { useLanguage } from "@/contexts/LanguageContext";
 import type { Customer } from "@/types";
 
@@ -21,7 +18,6 @@ const emptyForm = { name: "", phone: "", address: "", notes: "", cnic: "", email
 
 export default function Customers() {
   const { t } = useLanguage();
-<<<<<<< HEAD
   const customersRaw = useLiveQuery(() => db.customers.toArray(), []);
   const transactionsRaw = useLiveQuery(() => db.transactions.toArray(), []);
   const customers = useMemo((): CustomerWithBalance[] => {
@@ -35,9 +31,6 @@ export default function Customers() {
     }
     return list.map(c => ({ ...c, balance: balById[c.id] ?? 0 }));
   }, [customersRaw, transactionsRaw]);
-=======
-  const [customers, setCustomers] = useState<CustomerWithBalance[]>([]);
->>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -55,18 +48,6 @@ export default function Customers() {
     { value: "overdue", label: t("filter_overdue") },
     { value: "balance", label: t("filter_with_balance") },
   ];
-<<<<<<< HEAD
-=======
-
-  async function load() {
-    const all = await getCustomers();
-    const withBal = await Promise.all(all.map(async c => ({ ...c, balance: await getCustomerBalance(c.id) })));
-    setCustomers(withBal);
-    setLoading(false);
-  }
-
-  useEffect(() => { load(); }, []);
->>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
 
   const sorted = [...customers].sort((a, b) => {
     if (sortBy === "newest") return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
@@ -120,7 +101,6 @@ export default function Customers() {
   async function toggleActive(c: Customer) {
     await updateCustomer(c.id, { isActive: !c.isActive });
     toast.success(c.isActive ? t("customer_updated") : t("customer_updated"));
-<<<<<<< HEAD
   }
 
   async function confirmDeleteCustomer() {
@@ -128,16 +108,6 @@ export default function Customers() {
     await deleteCustomer(deleteTarget.id);
     toast.success(t("customer_deleted"));
     setDeleteTarget(null);
-=======
-    load();
-  }
-
-  async function handleDelete(c: CustomerWithBalance) {
-    if (!confirm(t("delete_customer_confirm"))) return;
-    await deleteCustomer(c.id);
-    toast.success(t("customer_deleted"));
-    load();
->>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
   }
 
   function openWhatsApp(c: Customer, balance: number) {

@@ -78,13 +78,10 @@ export interface Settings {
   receiptFooter: string;
   shopType: "kiryana" | "pro" | "";
   printerWidth: "58mm" | "80mm";
-<<<<<<< HEAD
   /** When true and pinCode is 4 digits, show PIN gate until sessionStorage unlock. */
   pinEnabled: boolean;
   /** Four-digit PIN (digits only). Empty when lock disabled or not yet set. */
   pinCode: string;
-=======
->>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
 }
 
 export interface DailySummary {

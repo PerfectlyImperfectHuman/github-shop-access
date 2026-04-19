@@ -41,26 +41,18 @@ export async function initSettings(): Promise<Settings> {
   const existing = await db.settings.get("default");
   if (existing) {
     // Backfill new fields for users upgrading from v2
-<<<<<<< HEAD
     const ex = existing as Partial<Settings> & Record<string, unknown>;
     const backfillPin = !("pinEnabled" in ex) || typeof ex.pinCode !== "string";
     const pinCode =
       typeof ex.pinCode === "string" && /^\d{0,4}$/.test(ex.pinCode) ? ex.pinCode : "";
-=======
->>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
     const patched: Settings = {
       ...existing,
       language: (existing.language === "ur" ? "ur" : "en"),
       printerWidth: existing.printerWidth === "80mm" ? "80mm" : "58mm",
-<<<<<<< HEAD
       pinEnabled: ex.pinEnabled === true,
       pinCode,
     };
     if (patched.printerWidth !== existing.printerWidth || patched.language !== existing.language || backfillPin) {
-=======
-    };
-    if (patched.printerWidth !== existing.printerWidth || patched.language !== existing.language) {
->>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
       await db.settings.put(patched);
     }
     return patched;
@@ -79,11 +71,8 @@ export async function initSettings(): Promise<Settings> {
     receiptFooter: "Thank you for your business!",
     shopType: "",
     printerWidth: "58mm",
-<<<<<<< HEAD
     pinEnabled: false,
     pinCode: "",
-=======
->>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
   };
   await db.settings.put(defaults);
   return defaults;
@@ -200,10 +189,7 @@ export async function deleteTransaction(id: string): Promise<void> {
   const txn = await db.transactions.get(id);
   if (txn) {
     if (txn.productId && txn.quantity && txn.type === "credit") await updateProductStock(txn.productId, txn.quantity);
-<<<<<<< HEAD
     if (txn.productId && txn.quantity && txn.type === "sale") await updateProductStock(txn.productId, txn.quantity);
-=======
->>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
     if (txn.productId && txn.quantity && txn.type === "purchase") await updateProductStock(txn.productId, -txn.quantity);
     await db.transactions.delete(id);
   }

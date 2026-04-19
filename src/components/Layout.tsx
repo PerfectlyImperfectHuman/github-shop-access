@@ -3,15 +3,11 @@ import {
   LayoutDashboard, Users, PlusCircle, History, BarChart3, Settings,
   Menu, X, Package, Moon, Sun, ShoppingCart, ClipboardCheck, Truck,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { db, initSettings } from "@/lib/db";
 import { useLanguage } from "@/contexts/LanguageContext";
-<<<<<<< HEAD
-=======
-import { useEffect } from "react";
->>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
 import type { StringKey } from "@/lib/i18n";
 
 interface NavItem { to: string; icon: any; labelKey: StringKey; primary?: boolean; }
@@ -57,10 +53,7 @@ const proBottomNav: NavItem[] = [
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [darkMode, setDarkMode]       = useState(false);
-<<<<<<< HEAD
   const [online, setOnline]           = useState(() => (typeof navigator !== "undefined" ? navigator.onLine : true));
-=======
->>>>>>> 87ebf8479c61fd3a980d116edbcae7ffca596572
   const { t, shopType, isUrdu } = useLanguage();
   const location = useLocation();
 
