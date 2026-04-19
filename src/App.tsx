@@ -20,6 +20,8 @@ import { initSettings } from "./lib/db";
 import { isPinSessionUnlocked } from "./lib/pinSession";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import type { Settings } from "./types";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { setupAutoBackup } from "./lib/cloudBackup";
 
 type BootPhase = "splash" | "first_run" | "pin" | "main";
 
@@ -28,6 +30,7 @@ export default function App() {
   const [settings, setSettings] = useState<Settings | null>(null);
 
   useEffect(() => {
+    setupAutoBackup();
     initSettings().then((s) => {
       setSettings(s);
       if (!s.shopType) setPhase("first_run");
@@ -92,35 +95,40 @@ export default function App() {
   }
 
   return (
-    <LanguageProvider>
-      <Toaster position="top-center" richColors />
-      {phase === "first_run" ? (
-        <BrowserRouter>
-          <FirstRun onComplete={handleFirstRunComplete} />
-        </BrowserRouter>
-      ) : phase === "pin" && settings && /^\d{4}$/.test(settings.pinCode) ? (
-        <PinLock expectedPin={settings.pinCode} onSuccess={handlePinSuccess} />
-      ) : (
-        <BrowserRouter>
-          <Routes>
-            <Route element={<Layout />}>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/customers" element={<Customers />} />
-              <Route path="/customers/:id" element={<CustomerLedger />} />
-              <Route path="/suppliers" element={<Suppliers />} />
-              <Route path="/suppliers/:id" element={<SupplierLedger />} />
-              <Route path="/new-transaction" element={<NewTransaction />} />
-              <Route path="/transactions" element={<TransactionHistory />} />
-              <Route path="/products" element={<Products />} />
-              <Route path="/sale" element={<SaleReceipt />} />
-              <Route path="/reports" element={<Reports />} />
-              <Route path="/daily-close" element={<DailyClose />} />
-              <Route path="/settings" element={<SettingsPage />} />
-            </Route>
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </BrowserRouter>
-      )}
-    </LanguageProvider>
+    <ErrorBoundary>
+      <LanguageProvider>
+        <Toaster position="top-center" richColors />
+        {phase === "first_run" ? (
+          <BrowserRouter>
+            <FirstRun onComplete={handleFirstRunComplete} />
+          </BrowserRouter>
+        ) : phase === "pin" && settings && /^\d{4}$/.test(settings.pinCode) ? (
+          <PinLock
+            expectedPin={settings.pinCode}
+            onSuccess={handlePinSuccess}
+          />
+        ) : (
+          <BrowserRouter>
+            <Routes>
+              <Route element={<Layout />}>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/customers" element={<Customers />} />
+                <Route path="/customers/:id" element={<CustomerLedger />} />
+                <Route path="/suppliers" element={<Suppliers />} />
+                <Route path="/suppliers/:id" element={<SupplierLedger />} />
+                <Route path="/new-transaction" element={<NewTransaction />} />
+                <Route path="/transactions" element={<TransactionHistory />} />
+                <Route path="/products" element={<Products />} />
+                <Route path="/sale" element={<SaleReceipt />} />
+                <Route path="/reports" element={<Reports />} />
+                <Route path="/daily-close" element={<DailyClose />} />
+                <Route path="/settings" element={<SettingsPage />} />
+              </Route>
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </BrowserRouter>
+        )}
+      </LanguageProvider>
+    </ErrorBoundary>
   );
 }
