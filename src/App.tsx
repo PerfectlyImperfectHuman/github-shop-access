@@ -13,6 +13,8 @@ import SettingsPage from "./pages/Settings";
 import SaleReceipt from "./pages/SaleReceipt";
 import DailyClose from "./pages/DailyClose";
 import FirstRun from "./pages/FirstRun";
+import Suppliers from "./pages/Suppliers";
+import SupplierLedger from "./pages/SupplierLedger";
 import { initSettings } from "./lib/db";
 import { LanguageProvider } from "./contexts/LanguageContext";
 
@@ -58,6 +60,8 @@ export default function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/customers" element={<Customers />} />
             <Route path="/customers/:id" element={<CustomerLedger />} />
+            <Route path="/suppliers" element={<Suppliers />} />
+            <Route path="/suppliers/:id" element={<SupplierLedger />} />
             <Route path="/new-transaction" element={<NewTransaction />} />
             <Route path="/transactions" element={<TransactionHistory />} />
             <Route path="/products" element={<Products />} />
