@@ -6,6 +6,7 @@ import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import { SelectField } from "@/components/ui/select-field";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { Product } from "@/types";
 
 const CATEGORIES = ["General", "Grocery", "Electronics", "Clothing", "Hardware", "Medicine", "Stationery", "Other"];
@@ -17,6 +18,7 @@ const UNIT_OPTIONS = UNITS.map(u => ({ value: u, label: u }));
 const emptyForm = { name: "", category: "General", sku: "", price: 0, costPrice: 0, stock: 0, unit: "pcs", minStock: 5 };
 
 export default function Products() {
+  const { t } = useLanguage();
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -110,7 +112,7 @@ export default function Products() {
 
   const lowStock = products.filter(p => p.isActive && p.stock <= p.minStock);
   const totalValue = products.filter(p => p.isActive).reduce((s, p) => s + p.price * p.stock, 0);
-  const filterCategoryOptions = [{ value: "", label: "All Categories" }, ...CATEGORY_OPTIONS];
+  const filterCategoryOptions = [{ value: "", label: t("category") }, ...CATEGORY_OPTIONS];
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -122,10 +124,10 @@ export default function Products() {
       {/* Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Total Products", value: products.length, color: "text-card-foreground" },
-          { label: "Active", value: products.filter(p => p.isActive).length, color: "text-success" },
-          { label: "Low Stock", value: lowStock.length, color: "text-warning" },
-          { label: "Inventory Value", value: formatCurrency(totalValue), color: "text-primary" },
+          { label: t("nav_products"), value: products.length, color: "text-card-foreground" },
+          { label: t("active"), value: products.filter(p => p.isActive).length, color: "text-success" },
+          { label: t("low_stock"), value: lowStock.length, color: "text-warning" },
+          { label: t("total"), value: formatCurrency(totalValue), color: "text-primary" },
         ].map(s => (
           <div key={s.label} className="bg-card rounded-xl border border-border p-3 shadow-sm">
             <p className="text-xs text-muted-foreground">{s.label}</p>
@@ -171,7 +173,7 @@ export default function Products() {
           </button>
           <button onClick={() => openNewForm()}
             className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition whitespace-nowrap">
-            <Plus className="w-4 h-4" /> Add Product
+            <Plus className="w-4 h-4" /> {t("add_product")}
           </button>
         </div>
       </div>
