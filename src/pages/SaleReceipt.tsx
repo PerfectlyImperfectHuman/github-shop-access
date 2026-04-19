@@ -224,8 +224,8 @@ export default function SaleReceipt() {
         {/* Page header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="font-display font-bold text-xl text-foreground">New Sale</h1>
-            <p className="text-sm text-muted-foreground">Scan · Add items · Print receipt</p>
+            <h1 className="font-display font-bold text-xl text-foreground">{t("nav_pos")}</h1>
+            <p className="text-sm text-muted-foreground">{shopType === "kiryana" ? t("nav_pos") : "Scan · Add items · Print receipt"}</p>
           </div>
           {cart.length > 0 && (
             <button onClick={startNewSale} className="text-xs text-muted-foreground hover:text-destructive transition flex items-center gap-1">
