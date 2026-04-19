@@ -6,21 +6,16 @@ import { formatCurrency, daysAgo } from "@/lib/utils";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { SelectField } from "@/components/ui/select-field";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { Customer } from "@/types";
 
 interface CustomerWithBalance extends Customer { balance: number; }
 
 const emptyForm = { name: "", phone: "", address: "", notes: "", cnic: "", email: "", creditLimit: 0 };
 
-const filterOptions = [
-  { value: "all", label: "All Customers" },
-  { value: "active", label: "Active Only" },
-  { value: "inactive", label: "Inactive Only" },
-  { value: "overdue", label: "Over Credit Limit" },
-  { value: "balance", label: "Has Outstanding Balance" },
-];
 
 export default function Customers() {
+  const { t } = useLanguage();
   const [customers, setCustomers] = useState<CustomerWithBalance[]>([]);
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -30,6 +25,14 @@ export default function Customers() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [sortBy, setSortBy] = useState("newest");
   const navigate = useNavigate();
+
+  const filterOptions = [
+    { value: "all", label: t("filter_all") },
+    { value: "active", label: t("filter_active") },
+    { value: "inactive", label: t("filter_inactive") },
+    { value: "overdue", label: t("filter_overdue") },
+    { value: "balance", label: t("filter_with_balance") },
+  ];
 
   async function load() {
     const all = await getCustomers();
