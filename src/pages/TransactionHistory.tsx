@@ -5,11 +5,13 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { SelectField } from "@/components/ui/select-field";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { Transaction, Customer } from "@/types";
 
 interface EnrichedTransaction extends Transaction { customerName: string; }
 
 export default function TransactionHistory() {
+  const { t } = useLanguage();
   const [transactions, setTransactions] = useState<EnrichedTransaction[]>([]);
   const [customers, setCustomers]       = useState<Customer[]>([]);
   const [filterCustomer, setFilterCustomer] = useState("");
@@ -26,7 +28,7 @@ export default function TransactionHistory() {
     const enriched = await Promise.all(
       txns.map(async t => {
         const c = await getCustomer(t.customerId);
-        return { ...t, customerName: c?.name || (t.type === "sale" ? "Cash Sale" : "Unknown") };
+        return { ...t, customerName: c?.name || (t.type === "sale" ? "Cash Sale" : "—") };
       })
     );
     setTransactions(enriched);
@@ -53,9 +55,9 @@ export default function TransactionHistory() {
   const hasFilters   = filterCustomer || filterType || dateFrom || dateTo || search;
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this transaction? This cannot be undone.")) return;
+    if (!confirm(t("delete_txn_confirm"))) return;
     await deleteTransaction(id);
-    toast.success("Transaction deleted");
+    toast.success(t("txn_deleted"));
     load();
   }
 
@@ -68,14 +70,14 @@ export default function TransactionHistory() {
   }
 
   const customerOptions = [
-    { value: "", label: "All Customers" },
+    { value: "", label: t("all_customers") },
     ...customers.map(c => ({ value: c.id, label: c.name, sublabel: c.phone || undefined })),
   ];
   const typeOptions = [
-    { value: "", label: "All Types" },
-    { value: "credit", label: "Udhar (Credit)" },
-    { value: "payment", label: "Wapsi (Payment)" },
-    { value: "sale", label: "Cash Sale" },
+    { value: "", label: t("all_types") },
+    { value: "credit", label: t("udhar_credit") },
+    { value: "payment", label: t("payment_wapsi") },
+    { value: "sale", label: t("cash_sale") },
   ];
 
   return (
@@ -83,9 +85,9 @@ export default function TransactionHistory() {
       {/* Summary */}
       <div className="grid grid-cols-3 gap-2">
         {[
-          { label: "Udhar",    val: totalCredit,  sub: `${filtered.filter(t => t.type === "credit").length} entries`,  cls: "text-destructive" },
-          { label: "Wapsi",   val: totalPayment, sub: `${filtered.filter(t => t.type === "payment").length} entries`, cls: "text-success" },
-          { label: "Cash",    val: totalSales,   sub: `${filtered.filter(t => t.type === "sale").length} sales`,      cls: "text-primary" },
+          { label: t("udhar_credit"),    val: totalCredit,  sub: `${filtered.filter(t => t.type === "credit").length}`,  cls: "text-destructive" },
+          { label: t("payment_wapsi"),   val: totalPayment, sub: `${filtered.filter(t => t.type === "payment").length}`, cls: "text-success" },
+          { label: t("cash_sale"),       val: totalSales,   sub: `${filtered.filter(t => t.type === "sale").length}`,    cls: "text-primary" },
         ].map(s => (
           <div key={s.label} className="bg-card rounded-xl border border-border p-3 shadow-sm">
             <p className="text-xs text-muted-foreground">{s.label}</p>
@@ -100,7 +102,7 @@ export default function TransactionHistory() {
         {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input type="text" placeholder="Search name or description..."
+          <input type="text" placeholder={t("search_history_placeholder")}
             value={search} onChange={e => setSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           />
@@ -116,7 +118,7 @@ export default function TransactionHistory() {
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
-            <span className="text-xs text-muted-foreground w-7 shrink-0">From</span>
+            <span className="text-xs text-muted-foreground w-7 shrink-0">{t("from")}</span>
             <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
               className="flex-1 px-3 py-2 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
@@ -128,7 +130,7 @@ export default function TransactionHistory() {
           </div>
           <div className="flex items-center gap-2">
             <div className="w-4 shrink-0" />
-            <span className="text-xs text-muted-foreground w-7 shrink-0">To</span>
+            <span className="text-xs text-muted-foreground w-7 shrink-0">{t("to")}</span>
             <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
               className="flex-1 px-3 py-2 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
@@ -142,7 +144,7 @@ export default function TransactionHistory() {
 
         {hasFilters && (
           <button onClick={clearFilters} className="w-full text-xs text-primary font-medium hover:underline py-1">
-            Clear all filters
+            {t("clear_filters")}
           </button>
         )}
       </div>
@@ -158,8 +160,8 @@ export default function TransactionHistory() {
 
         {filtered.length === 0 ? (
           <div className="px-6 py-12 text-center text-muted-foreground">
-            <p className="font-medium">{transactions.length === 0 ? "No transactions yet" : "No transactions match your filters"}</p>
-            {hasFilters && <button onClick={clearFilters} className="mt-3 text-sm text-primary hover:underline">Clear filters</button>}
+            <p className="font-medium">{transactions.length === 0 ? t("no_transactions_yet") : t("no_customers_match")}</p>
+            {hasFilters && <button onClick={clearFilters} className="mt-3 text-sm text-primary hover:underline">{t("clear_filters")}</button>}
           </div>
         ) : (
           <div className="divide-y divide-border">
@@ -175,7 +177,7 @@ export default function TransactionHistory() {
 
                 <div className="flex-1 min-w-0 cursor-pointer" onClick={() => txn.customerId && navigate(`/customers/${txn.customerId}`)}>
                   <p className="text-sm font-medium text-card-foreground truncate">{txn.customerName}</p>
-                  <p className="text-xs text-muted-foreground truncate">{txn.description || (txn.type === "credit" ? "Udhar" : txn.type === "payment" ? "Wapsi" : "Cash Sale")}</p>
+                  <p className="text-xs text-muted-foreground truncate">{txn.description || (txn.type === "credit" ? t("udhar_credit") : txn.type === "payment" ? t("payment_wapsi") : t("cash_sale"))}</p>
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
