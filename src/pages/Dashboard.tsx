@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
-import { liveQuery } from "dexie";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Users, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Package, AlertTriangle, Wallet, CalendarDays, Truck } from "lucide-react";
 import { db, getDashboardStats } from "@/lib/db";
@@ -14,23 +13,20 @@ interface EnrichedTransaction extends Transaction { customerName?: string; }
 export default function Dashboard() {
   const t = useT();
   const { shopType } = useLanguage();
-  const stats = useLiveQuery(() => liveQuery(async () => getDashboardStats()), []);
+  const stats = useLiveQuery(() => getDashboardStats(), []);
   const settingsRow = useLiveQuery(() => db.settings.get("default"), []);
-  const recent = useLiveQuery(
-    () => liveQuery(async () => {
-      const [txns, custs] = await Promise.all([
-        db.transactions.orderBy("date").reverse().limit(50).toArray(),
-        db.customers.toArray(),
-      ]);
-      const map = new Map(custs.map(c => [c.id, c.name]));
-      const sorted = [...txns].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 10);
-      return sorted.map(tt => ({
-        ...tt,
-        customerName: map.get(tt.customerId) || (tt.type === "sale" ? "Cash Sale" : "—"),
-      })) as EnrichedTransaction[];
-    }),
-    [],
-  );
+  const recent = useLiveQuery(async () => {
+    const [txns, custs] = await Promise.all([
+      db.transactions.orderBy("date").reverse().limit(50).toArray(),
+      db.customers.toArray(),
+    ]);
+    const map = new Map(custs.map(c => [c.id, c.name]));
+    const sorted = [...txns].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 10);
+    return sorted.map(tt => ({
+      ...tt,
+      customerName: map.get(tt.customerId) || (tt.type === "sale" ? "Cash Sale" : "—"),
+    })) as EnrichedTransaction[];
+  }, []);
   const shopName = settingsRow?.shopName || "My Shop";
   const loading = stats === undefined || recent === undefined || settingsRow === undefined;
   const navigate = useNavigate();

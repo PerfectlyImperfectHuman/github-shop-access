@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { liveQuery } from "dexie";
 import { useLiveQuery } from "dexie-react-hooks";
 import { ArrowLeft, Phone, ShoppingBag, DollarSign, Trash2, Plus, X, Truck } from "lucide-react";
 import { db, addTransaction, deleteTransaction } from "@/lib/db";
@@ -17,22 +16,19 @@ export default function SupplierLedger() {
   const t = useT();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const bundle = useLiveQuery(
-    () => liveQuery(async () => {
-      if (!id) return { supplier: null as Supplier | null, transactions: [] as Transaction[], balance: 0 };
-      const s = await db.suppliers.get(id);
-      const txns = await db.transactions.where("supplierId").equals(id).toArray();
-      const sortedDesc = [...txns].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      const opening = s?.openingBalance || 0;
-      const bal = txns.reduce((b, tr) => {
-        if (tr.type === "purchase") return b + tr.amount;
-        if (tr.type === "supplier_payment") return b - tr.amount;
-        return b;
-      }, opening);
-      return { supplier: s ?? null, transactions: sortedDesc, balance: bal };
-    }),
-    [id],
-  );
+  const bundle = useLiveQuery(async () => {
+    if (!id) return { supplier: null as Supplier | null, transactions: [] as Transaction[], balance: 0 };
+    const s = await db.suppliers.get(id);
+    const txns = await db.transactions.where("supplierId").equals(id).toArray();
+    const sortedDesc = [...txns].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const opening = s?.openingBalance || 0;
+    const bal = txns.reduce((b, tr) => {
+      if (tr.type === "purchase") return b + tr.amount;
+      if (tr.type === "supplier_payment") return b - tr.amount;
+      return b;
+    }, opening);
+    return { supplier: s ?? null, transactions: sortedDesc, balance: bal };
+  }, [id]);
   const supplier = bundle?.supplier ?? null;
   const transactions = bundle?.transactions ?? [];
   const balance = bundle?.balance ?? 0;

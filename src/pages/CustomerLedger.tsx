@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { liveQuery } from "dexie";
 import { useLiveQuery } from "dexie-react-hooks";
 import { ArrowUpRight, ArrowDownRight, ArrowLeft, Phone, MapPin, Printer, User, Wallet, MessageCircle, PlusCircle, Trash2 } from "lucide-react";
 import { db, deleteTransaction } from "@/lib/db";
@@ -17,23 +16,20 @@ export default function CustomerLedger() {
   const { t } = useLanguage();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const ledger = useLiveQuery(
-    () => liveQuery(async () => {
-      if (!id) return { customer: null as Customer | null, transactions: [] as Transaction[], balance: 0 };
-      const [c, txns] = await Promise.all([
-        db.customers.get(id),
-        db.transactions.where("customerId").equals(id).toArray(),
-      ]);
-      const sorted = [...txns].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      const bal = sorted.reduce((b, tr) => {
-        if (tr.type === "credit") return b + tr.amount;
-        if (tr.type === "payment") return b - tr.amount;
-        return b;
-      }, 0);
-      return { customer: c ?? null, transactions: sorted, balance: bal };
-    }),
-    [id],
-  );
+  const ledger = useLiveQuery(async () => {
+    if (!id) return { customer: null as Customer | null, transactions: [] as Transaction[], balance: 0 };
+    const [c, txns] = await Promise.all([
+      db.customers.get(id),
+      db.transactions.where("customerId").equals(id).toArray(),
+    ]);
+    const sorted = [...txns].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const bal = sorted.reduce((b, tr) => {
+      if (tr.type === "credit") return b + tr.amount;
+      if (tr.type === "payment") return b - tr.amount;
+      return b;
+    }, 0);
+    return { customer: c ?? null, transactions: sorted, balance: bal };
+  }, [id]);
   const customer = ledger?.customer ?? null;
   const transactions = ledger?.transactions ?? [];
   const balance = ledger?.balance ?? 0;
