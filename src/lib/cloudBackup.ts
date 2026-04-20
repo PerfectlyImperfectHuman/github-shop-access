@@ -1,19 +1,95 @@
 import {
-  signInWithPopup,
+  RecaptchaVerifier,
+  signInWithPhoneNumber,
   signOut as fbSignOut,
   onAuthStateChanged,
   type User,
+  type ConfirmationResult,
 } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
-import { auth, firestore, googleProvider } from "./firebase";
+import { auth, firestore } from "./firebase";
 import { exportData, importData } from "./db";
 
-// ── Auth ────────────────────────────────────────────────────────────────────
+// ── Phone number helpers ─────────────────────────────────────────────────────
 
-export async function signInWithGoogle(): Promise<User> {
-  const result = await signInWithPopup(auth, googleProvider);
+/** 03001234567 → 0300-1234567 (for display) */
+export function formatPakistaniPhone(raw: string): string {
+  const digits = raw.replace(/\D/g, "").slice(0, 11);
+  if (digits.length <= 4) return digits;
+  return digits.slice(0, 4) + "-" + digits.slice(4);
+}
+
+/** 0300-1234567 → +923001234567 (for Firebase) */
+export function toInternationalPhone(formatted: string): string {
+  const digits = formatted.replace(/\D/g, "");
+  if (digits.startsWith("0")) return "+92" + digits.slice(1);
+  if (digits.startsWith("92")) return "+" + digits;
+  return "+" + digits;
+}
+
+/** +923001234567 → 0300-1234567 (for display after auth) */
+export function fromInternationalPhone(intl: string): string {
+  if (intl.startsWith("+92")) {
+    const local = "0" + intl.slice(3);
+    return local.slice(0, 4) + "-" + local.slice(4);
+  }
+  return intl;
+}
+
+// ── reCAPTCHA + OTP ──────────────────────────────────────────────────────────
+
+let _recaptchaVerifier: RecaptchaVerifier | null = null;
+let _confirmationResult: ConfirmationResult | null = null;
+
+function getRecaptchaVerifier(): RecaptchaVerifier {
+  if (_recaptchaVerifier) return _recaptchaVerifier;
+
+  let container = document.getElementById("bahi-recaptcha");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "bahi-recaptcha";
+    container.style.cssText =
+      "position:fixed;bottom:0;right:0;z-index:-1;opacity:0;pointer-events:none;";
+    document.body.appendChild(container);
+  }
+
+  _recaptchaVerifier = new RecaptchaVerifier(auth, "bahi-recaptcha", {
+    size: "invisible",
+    callback: () => {},
+  });
+
+  return _recaptchaVerifier;
+}
+
+/** Step 1 — send OTP to Pakistani phone number */
+export async function sendPhoneOTP(internationalPhone: string): Promise<void> {
+  // Reset verifier on each attempt to avoid stale state
+  if (_recaptchaVerifier) {
+    try {
+      _recaptchaVerifier.clear();
+    } catch {}
+    _recaptchaVerifier = null;
+    const old = document.getElementById("bahi-recaptcha");
+    if (old) old.remove();
+  }
+
+  const appVerifier = getRecaptchaVerifier();
+  _confirmationResult = await signInWithPhoneNumber(
+    auth,
+    internationalPhone,
+    appVerifier,
+  );
+}
+
+/** Step 2 — verify the OTP code user typed */
+export async function verifyPhoneOTP(code: string): Promise<User> {
+  if (!_confirmationResult)
+    throw new Error("No OTP session — call sendPhoneOTP first");
+  const result = await _confirmationResult.confirm(code);
   return result.user;
 }
+
+// ── Auth state ───────────────────────────────────────────────────────────────
 
 export async function signOut(): Promise<void> {
   await fbSignOut(auth);
@@ -27,9 +103,7 @@ export function onAuthChange(cb: (user: User | null) => void): () => void {
   return onAuthStateChanged(auth, cb);
 }
 
-// ── Backup ──────────────────────────────────────────────────────────────────
-// Each table is stored as a separate Firestore document to stay under the 1MB limit.
-// Path: backups/{uid}/tables/{tableName}
+// ── Backup ───────────────────────────────────────────────────────────────────
 
 const TABLES = [
   "customers",
@@ -38,6 +112,9 @@ const TABLES = [
   "products",
   "expenses",
   "settings",
+  "kists",
+  "kistInstallments",
+  "cheques",
 ] as const;
 
 export async function backupToCloud(): Promise<void> {
@@ -56,15 +133,15 @@ export async function backupToCloud(): Promise<void> {
     ),
   );
 
-  // Write meta document for quick info display
   await setDoc(doc(firestore, "backups", user.uid, "tables", "_meta"), {
-    version: 3,
+    version: 4,
     backedUpAt: new Date().toISOString(),
     shopName: data.settings?.[0]?.shopName ?? "My Shop",
+    phone: user.phoneNumber ?? "",
   });
 }
 
-// ── Restore ─────────────────────────────────────────────────────────────────
+// ── Restore ──────────────────────────────────────────────────────────────────
 
 export async function getCloudBackupInfo(): Promise<{
   backedUpAt: string;
@@ -103,13 +180,13 @@ export async function restoreFromCloud(): Promise<void> {
 
   const json = JSON.stringify({
     ...restored,
-    version: 3,
+    version: 4,
     exportedAt: new Date().toISOString(),
   });
   await importData(json);
 }
 
-// ── Auto-backup on tab hide / browser close ──────────────────────────────────
+// ── Auto-backup ───────────────────────────────────────────────────────────────
 
 let _autoSetup = false;
 export function setupAutoBackup(): void {
