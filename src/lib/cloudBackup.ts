@@ -12,14 +12,12 @@ import { exportData, importData } from "./db";
 
 // ── Phone number helpers ─────────────────────────────────────────────────────
 
-/** 03001234567 → 0300-1234567 (for display) */
 export function formatPakistaniPhone(raw: string): string {
   const digits = raw.replace(/\D/g, "").slice(0, 11);
   if (digits.length <= 4) return digits;
   return digits.slice(0, 4) + "-" + digits.slice(4);
 }
 
-/** 0300-1234567 → +923001234567 (for Firebase) */
 export function toInternationalPhone(formatted: string): string {
   const digits = formatted.replace(/\D/g, "");
   if (digits.startsWith("0")) return "+92" + digits.slice(1);
@@ -27,7 +25,6 @@ export function toInternationalPhone(formatted: string): string {
   return "+" + digits;
 }
 
-/** +923001234567 → 0300-1234567 (for display after auth) */
 export function fromInternationalPhone(intl: string): string {
   if (intl.startsWith("+92")) {
     const local = "0" + intl.slice(3);
@@ -36,52 +33,35 @@ export function fromInternationalPhone(intl: string): string {
   return intl;
 }
 
-// ── reCAPTCHA + OTP ──────────────────────────────────────────────────────────
+// ── reCAPTCHA ────────────────────────────────────────────────────────────────
+// Caller passes in a real mounted DOM element — avoids the "F is null" crash
+// that happens when we create the element dynamically before the DOM is ready.
 
-let _recaptchaVerifier: RecaptchaVerifier | null = null;
-let _confirmationResult: ConfirmationResult | null = null;
-
-function getRecaptchaVerifier(): RecaptchaVerifier {
-  if (_recaptchaVerifier) return _recaptchaVerifier;
-
-  let container = document.getElementById("bahi-recaptcha");
-  if (!container) {
-    container = document.createElement("div");
-    container.id = "bahi-recaptcha";
-    container.style.cssText =
-      "position:fixed;bottom:0;right:0;z-index:-1;opacity:0;pointer-events:none;";
-    document.body.appendChild(container);
-  }
-
-  _recaptchaVerifier = new RecaptchaVerifier(auth, "bahi-recaptcha", {
+export function createRecaptchaVerifier(
+  element: HTMLElement,
+): RecaptchaVerifier {
+  return new RecaptchaVerifier(auth, element, {
     size: "invisible",
     callback: () => {},
+    "expired-callback": () => {},
   });
-
-  return _recaptchaVerifier;
 }
 
-/** Step 1 — send OTP to Pakistani phone number */
-export async function sendPhoneOTP(internationalPhone: string): Promise<void> {
-  // Reset verifier on each attempt to avoid stale state
-  if (_recaptchaVerifier) {
-    try {
-      _recaptchaVerifier.clear();
-    } catch {}
-    _recaptchaVerifier = null;
-    const old = document.getElementById("bahi-recaptcha");
-    if (old) old.remove();
-  }
+// ── OTP ──────────────────────────────────────────────────────────────────────
 
-  const appVerifier = getRecaptchaVerifier();
+let _confirmationResult: ConfirmationResult | null = null;
+
+export async function sendPhoneOTP(
+  internationalPhone: string,
+  verifier: RecaptchaVerifier,
+): Promise<void> {
   _confirmationResult = await signInWithPhoneNumber(
     auth,
     internationalPhone,
-    appVerifier,
+    verifier,
   );
 }
 
-/** Step 2 — verify the OTP code user typed */
 export async function verifyPhoneOTP(code: string): Promise<User> {
   if (!_confirmationResult)
     throw new Error("No OTP session — call sendPhoneOTP first");
