@@ -25,17 +25,18 @@ import { clearPinSession } from "@/lib/pinSession";
 import { PinNumpad, PinDots } from "@/pages/PinLock";
 import { cn } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { PhoneAuthModal } from "@/components/PhoneAuthModal";
+import { AccountModal } from "@/components/AccountModal";
 import { toast } from "sonner";
 import { useT, useLanguage } from "@/contexts/LanguageContext";
 import {
-  signOut,
+  signOutAndClear,
   onAuthChange,
   getCurrentUser,
   backupToCloud,
   restoreFromCloud,
   getCloudBackupInfo,
   fromInternationalPhone,
+  rotateRecoveryCode,
 } from "@/lib/cloudBackup";
 import type { User } from "firebase/auth";
 import type { Settings } from "@/types";
@@ -184,8 +185,7 @@ export default function SettingsPage() {
     setCloudUser(user);
     setBackupInfo(info);
     setShowPhoneModal(false);
-    toast.success("Number verify ho gaya — cloud backup active hai ✓");
-    // Trigger first backup right away if no existing backup found
+    toast.success("Account connected — cloud backup active hai ✓");
     if (!info) {
       try {
         await backupToCloud();
@@ -196,7 +196,7 @@ export default function SettingsPage() {
   }
 
   async function handleCloudSignOut() {
-    await signOut();
+    await signOutAndClear(cloudUser?.phoneNumber ?? "");
     setBackupInfo(null);
     toast.success("Cloud backup disconnected.");
   }
@@ -848,7 +848,7 @@ export default function SettingsPage() {
       </div>
 
       {showPhoneModal && (
-        <PhoneAuthModal
+        <AccountModal
           onSuccess={handlePhoneAuthSuccess}
           onClose={() => setShowPhoneModal(false)}
         />

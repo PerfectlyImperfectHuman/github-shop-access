@@ -1,28 +1,21 @@
 import {
-  RecaptchaVerifier,
-  signInWithPhoneNumber,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updatePassword,
   signOut as fbSignOut,
   onAuthStateChanged,
   type User,
-  type ConfirmationResult,
 } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { auth, firestore } from "./firebase";
 import { exportData, importData } from "./db";
 
-// ── Phone number helpers ─────────────────────────────────────────────────────
+// ── Phone helpers ────────────────────────────────────────────────────────────
 
 export function formatPakistaniPhone(raw: string): string {
   const digits = raw.replace(/\D/g, "").slice(0, 11);
   if (digits.length <= 4) return digits;
   return digits.slice(0, 4) + "-" + digits.slice(4);
-}
-
-export function toInternationalPhone(formatted: string): string {
-  const digits = formatted.replace(/\D/g, "");
-  if (digits.startsWith("0")) return "+92" + digits.slice(1);
-  if (digits.startsWith("92")) return "+" + digits;
-  return "+" + digits;
 }
 
 export function fromInternationalPhone(intl: string): string {
@@ -33,45 +26,184 @@ export function fromInternationalPhone(intl: string): string {
   return intl;
 }
 
-// ── reCAPTCHA ────────────────────────────────────────────────────────────────
-// Caller passes in a real mounted DOM element — avoids the "F is null" crash
-// that happens when we create the element dynamically before the DOM is ready.
-
-export function createRecaptchaVerifier(
-  element: HTMLElement,
-): RecaptchaVerifier {
-  return new RecaptchaVerifier(auth, element, {
-    size: "invisible",
-    callback: () => {},
-    "expired-callback": () => {},
-  });
+// Phone → fake Firebase email (03001234567 → 03001234567@bahi.app)
+function phoneToEmail(phone: string): string {
+  return phone.replace(/\D/g, "") + "@bahi.app";
 }
 
-// ── OTP ──────────────────────────────────────────────────────────────────────
+// ── Recovery code ─────────────────────────────────────────────────────────────
+// Format: BAHI-XXXX-XXXX (no ambiguous chars: I O 0 1)
 
-let _confirmationResult: ConfirmationResult | null = null;
+const RC_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
-export async function sendPhoneOTP(
-  internationalPhone: string,
-  verifier: RecaptchaVerifier,
+export function generateRecoveryCode(): string {
+  const group = (len: number) =>
+    Array.from(
+      { length: len },
+      () => RC_CHARS[Math.floor(Math.random() * RC_CHARS.length)],
+    ).join("");
+  return `BAHI-${group(4)}-${group(4)}`;
+}
+
+// ── Local encryption (PIN-based XOR — good enough for 4-digit PIN on device) ──
+
+function encryptRC(rc: string, pin: string): string {
+  const key = pin.repeat(Math.ceil(rc.length / pin.length)).slice(0, rc.length);
+  return rc
+    .split("")
+    .map((c, i) =>
+      (c.charCodeAt(0) ^ key.charCodeAt(i)).toString(16).padStart(2, "0"),
+    )
+    .join("");
+}
+
+function decryptRC(hex: string, pin: string): string {
+  const bytes = (hex.match(/.{2}/g) ?? []).map((h) => parseInt(h, 16));
+  const raw = bytes.map((b) => String.fromCharCode(b)).join("");
+  const key = pin
+    .repeat(Math.ceil(raw.length / pin.length))
+    .slice(0, raw.length);
+  return raw
+    .split("")
+    .map((c, i) => String.fromCharCode(c.charCodeAt(0) ^ key.charCodeAt(i)))
+    .join("");
+}
+
+// ── localStorage helpers ──────────────────────────────────────────────────────
+
+const LS_PREFIX = "bahi_rc_";
+
+function lsKey(phone: string): string {
+  return LS_PREFIX + phone.replace(/\D/g, "");
+}
+
+export function hasLocalAccount(phone: string): boolean {
+  return !!localStorage.getItem(lsKey(phone));
+}
+
+function saveRCLocally(phone: string, rc: string, pin: string): void {
+  localStorage.setItem(lsKey(phone), encryptRC(rc, pin));
+}
+
+function loadRCLocally(phone: string, pin: string): string | null {
+  const stored = localStorage.getItem(lsKey(phone));
+  if (!stored) return null;
+  try {
+    const decoded = decryptRC(stored, pin);
+    // Sanity check — recovery codes always start with "BAHI-"
+    return decoded.startsWith("BAHI-") ? decoded : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearLocalRC(phone: string): void {
+  localStorage.removeItem(lsKey(phone));
+}
+
+// ── Admin recovery key storage (in Firestore — readable by Taiyab via Console) ─
+
+async function saveAdminKey(
+  uid: string,
+  phone: string,
+  rc: string,
 ): Promise<void> {
-  _confirmationResult = await signInWithPhoneNumber(
-    auth,
-    internationalPhone,
-    verifier,
+  await setDoc(
+    doc(firestore, "recovery", uid),
+    {
+      adminKey: rc, // plaintext — Taiyab sees this in Console
+      phone: phone.replace(/\D/g, ""),
+      email: phoneToEmail(phone),
+      lastRotated: new Date().toISOString(),
+    },
+    { merge: true },
   );
 }
 
-export async function verifyPhoneOTP(code: string): Promise<User> {
-  if (!_confirmationResult)
-    throw new Error("No OTP session — call sendPhoneOTP first");
-  const result = await _confirmationResult.confirm(code);
-  return result.user;
+// ── Auth operations ───────────────────────────────────────────────────────────
+
+/** New user — creates Firebase account, stores PIN-encrypted RC locally and admin key in Firestore */
+export async function signUpWithPhonePin(
+  phone: string,
+  pin: string,
+): Promise<{ user: User; recoveryCode: string }> {
+  const rc = generateRecoveryCode();
+  const email = phoneToEmail(phone);
+
+  // RC is the Firebase password — user never types it directly on this device
+  const credential = await createUserWithEmailAndPassword(auth, email, rc);
+  const user = credential.user;
+
+  saveRCLocally(phone, rc, pin);
+  await saveAdminKey(user.uid, phone, rc);
+
+  return { user, recoveryCode: rc };
 }
 
-// ── Auth state ───────────────────────────────────────────────────────────────
+/** Returning user on same device — decrypts RC with PIN and signs in */
+export async function signInWithPhonePin(
+  phone: string,
+  pin: string,
+): Promise<User> {
+  const rc = loadRCLocally(phone, pin);
+  if (!rc)
+    throw Object.assign(new Error("Wrong PIN or no account on this device"), {
+      code: "bahi/wrong-pin",
+    });
 
-export async function signOut(): Promise<void> {
+  const credential = await signInWithEmailAndPassword(
+    auth,
+    phoneToEmail(phone),
+    rc,
+  );
+  return credential.user;
+}
+
+/** Recovery — user enters RC directly (new device / forgot PIN) */
+export async function signInWithRecoveryCode(
+  phone: string,
+  recoveryCode: string,
+): Promise<User> {
+  const credential = await signInWithEmailAndPassword(
+    auth,
+    phoneToEmail(phone),
+    recoveryCode.toUpperCase().trim(),
+  );
+  return credential.user;
+}
+
+/** After recovery login — store the RC locally with a new PIN */
+export async function setPinAfterRecovery(
+  phone: string,
+  pin: string,
+  recoveryCode: string,
+): Promise<void> {
+  saveRCLocally(phone, recoveryCode, pin);
+}
+
+/**
+ * Rotate the recovery code — called after admin-assisted recovery or by user choice.
+ * Generates new RC, updates Firebase password, re-encrypts locally, updates Firestore.
+ * Returns the new RC so the user can screenshot it.
+ */
+export async function rotateRecoveryCode(
+  phone: string,
+  pin: string,
+): Promise<string> {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not signed in");
+
+  const newRC = generateRecoveryCode();
+  await updatePassword(user, newRC); // update Firebase auth password
+  saveRCLocally(phone, newRC, pin); // re-encrypt locally with same PIN
+  await saveAdminKey(user.uid, phone, newRC); // update Firestore admin key
+
+  return newRC;
+}
+
+/** Sign out and clear local RC for this phone */
+export async function signOutAndClear(phone: string): Promise<void> {
+  clearLocalRC(phone);
   await fbSignOut(auth);
 }
 
@@ -117,11 +249,8 @@ export async function backupToCloud(): Promise<void> {
     version: 4,
     backedUpAt: new Date().toISOString(),
     shopName: data.settings?.[0]?.shopName ?? "My Shop",
-    phone: user.phoneNumber ?? "",
   });
 }
-
-// ── Restore ──────────────────────────────────────────────────────────────────
 
 export async function getCloudBackupInfo(): Promise<{
   backedUpAt: string;
@@ -158,12 +287,13 @@ export async function restoreFromCloud(): Promise<void> {
     }),
   );
 
-  const json = JSON.stringify({
-    ...restored,
-    version: 4,
-    exportedAt: new Date().toISOString(),
-  });
-  await importData(json);
+  await importData(
+    JSON.stringify({
+      ...restored,
+      version: 4,
+      exportedAt: new Date().toISOString(),
+    }),
+  );
 }
 
 // ── Auto-backup ───────────────────────────────────────────────────────────────
