@@ -136,17 +136,11 @@ export async function initSettings(): Promise<Settings> {
       printerWidth: existing.printerWidth === "80mm" ? "80mm" : "58mm",
       pinEnabled: ex.pinEnabled === true,
       pinCode,
-      staffPinEnabled: ex.staffPinEnabled === true,
-      staffPin:
-        typeof ex.staffPin === "string" && /^\d{0,4}$/.test(ex.staffPin)
-          ? ex.staffPin
-          : "",
     };
     if (
       patched.printerWidth !== existing.printerWidth ||
       patched.language !== existing.language ||
-      backfillPin ||
-      !("staffPin" in ex) // ← add this
+      backfillPin
     ) {
       await db.settings.put(patched);
     }
@@ -168,8 +162,6 @@ export async function initSettings(): Promise<Settings> {
     printerWidth: "58mm",
     pinEnabled: false,
     pinCode: "",
-    staffPinEnabled: false,
-    staffPin: "",
   };
   await db.settings.put(defaults);
   return defaults;

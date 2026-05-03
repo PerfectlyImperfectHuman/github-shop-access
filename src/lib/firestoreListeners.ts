@@ -1,11 +1,10 @@
 /**
  * firestoreListeners.ts -- Real-time Firestore -> Dexie sync
  *
- * Starts onSnapshot listeners for every collection under shops/{shopId}.
- * shopId is passed in (from membership resolution) -- NOT auth.currentUser.uid.
- * This means all members of a shop (owners + staff) listen to the same data.
+ * Starts onSnapshot listeners for every collection under users/{uid}.
+ * uid comes from auth.currentUser at the time listeners are started.
  *
- * When Firestore delivers a change (from any device/member):
+ * When Firestore delivers a change (from any device):
  *   - If _deleted=true       -> delete from Dexie
  *   - If _updatedBy=DEVICE_ID -> skip (our own write echoing back)
  *   - Otherwise              -> upsert into Dexie -> triggers useLiveQuery
@@ -18,7 +17,7 @@ import {
   type Unsubscribe,
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
-import { firestore } from "./firebase";
+import { firestore, auth } from "./firebase";
 import { db } from "./db";
 import { DEVICE_ID, type SyncableTable } from "./syncService";
 
@@ -36,15 +35,17 @@ const TABLES: SyncableTable[] = [
 let _unsubscribers: Unsubscribe[] = [];
 
 /**
- * Start all Firestore listeners for a given shopId.
- * Pass shopId (first owner's uid), NOT the current user's uid.
- * Call after successful login and membership resolution.
+ * Start all Firestore listeners for the currently signed-in user.
+ * Call after successful login.
  */
-export function startFirestoreListeners(shopId: string): void {
+export function startFirestoreListeners(): void {
   stopFirestoreListeners();
 
+  const user = auth.currentUser;
+  if (!user) return;
+
   for (const table of TABLES) {
-    const collRef = collection(firestore, "shops", shopId, table);
+    const collRef = collection(firestore, "users", user.uid, table);
     const unsub = onSnapshot(
       query(collRef),
       { includeMetadataChanges: false },

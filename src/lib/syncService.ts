@@ -7,9 +7,7 @@
  *   2. If online  -> write to Firestore -> other devices get it via onSnapshot
  *   3. If offline -> queue the write    -> flush when back online
  *
- * MULTI-USER: shopId (first owner's uid) is stored in localStorage after login.
- * All members (owners + staff) write to shops/{shopId}/... regardless of their
- * own uid. This is what makes the shared account model work.
+ * All data lives under users/{uid}/... where uid = auth.currentUser.uid.
  *
  * CONFLICT RESOLUTION: last-write-wins per document via _updatedAt.
  */
@@ -33,32 +31,13 @@ function getDeviceId(): string {
 
 export const DEVICE_ID = getDeviceId();
 
-// -- ShopId management -----------------------------------------------------
-// shopId = first owner's Firebase uid. Cached in localStorage so it's
-// available synchronously inside syncPut/syncDelete without async calls.
-
-const SHOP_ID_KEY = "bahi_shop_id";
-
-export function setShopId(id: string): void {
-  localStorage.setItem(SHOP_ID_KEY, id);
-}
-
-export function getShopId(): string | null {
-  return localStorage.getItem(SHOP_ID_KEY);
-}
-
-export function clearShopId(): void {
-  localStorage.removeItem(SHOP_ID_KEY);
-}
-
 // -- Firestore path helper -------------------------------------------------
-// All shop data lives under shops/{shopId}/{collection}/{docId}
+// All user data lives under users/{uid}/{collection}/{docId}
 
-function shopRef(collectionName: string, docId: string) {
-  if (!auth.currentUser) throw new Error("Not authenticated");
-  const shopId = getShopId();
-  if (!shopId) throw new Error("Shop not initialised — shopId missing");
-  return doc(firestore, "shops", shopId, collectionName, docId);
+function userRef(collectionName: string, docId: string) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not authenticated");
+  return doc(firestore, "users", user.uid, collectionName, docId);
 }
 
 // -- Core write ------------------------------------------------------------
@@ -75,7 +54,7 @@ export async function syncPut(
   // 1. Always write to Dexie first
   await (db[table] as any).put(record);
 
-  if (!auth.currentUser || !getShopId()) return;
+  if (!auth.currentUser) return;
 
   const firestoreDoc = {
     ...record,
@@ -86,7 +65,7 @@ export async function syncPut(
 
   if (navigator.onLine) {
     try {
-      await setDoc(shopRef(table, record.id), firestoreDoc, { merge: true });
+      await setDoc(userRef(table, record.id), firestoreDoc, { merge: true });
     } catch {
       await queueWrite(table, record.id, record, "put");
     }
@@ -105,7 +84,7 @@ export async function syncDelete(
 ): Promise<void> {
   await (db[table] as any).delete(id);
 
-  if (!auth.currentUser || !getShopId()) return;
+  if (!auth.currentUser) return;
 
   const tombstone = {
     id,
@@ -116,7 +95,7 @@ export async function syncDelete(
 
   if (navigator.onLine) {
     try {
-      await setDoc(shopRef(table, id), tombstone, { merge: true });
+      await setDoc(userRef(table, id), tombstone, { merge: true });
     } catch {
       await queueWrite(table, id, { id }, "delete");
     }
@@ -152,7 +131,7 @@ async function queueWrite(
  * Called on: app start (if logged in), window online event.
  */
 export async function flushSyncQueue(): Promise<void> {
-  if (!auth.currentUser || !getShopId() || !navigator.onLine) return;
+  if (!auth.currentUser || !navigator.onLine) return;
 
   const queued = await db.syncQueue.toArray();
   if (queued.length === 0) return;
@@ -160,7 +139,7 @@ export async function flushSyncQueue(): Promise<void> {
   await Promise.allSettled(
     queued.map(async (item) => {
       try {
-        const ref = shopRef(item.table as SyncableTable, item.recordId);
+        const ref = userRef(item.table as SyncableTable, item.recordId);
         if (item.op === "delete") {
           await setDoc(
             ref,
@@ -198,10 +177,10 @@ export async function flushSyncQueue(): Promise<void> {
 
 /**
  * Push ALL local Dexie data to Firestore.
- * Called once on first login for an account that has existing local data.
+ * Called once on first login for an account with existing local data.
  */
 export async function initialPushToFirestore(): Promise<void> {
-  if (!auth.currentUser || !getShopId()) return;
+  if (!auth.currentUser) return;
 
   const tables: SyncableTable[] = [
     "customers",
@@ -219,7 +198,7 @@ export async function initialPushToFirestore(): Promise<void> {
     await Promise.all(
       records.map((record: Record<string, unknown> & { id: string }) =>
         setDoc(
-          shopRef(table, record.id),
+          userRef(table, record.id),
           {
             ...record,
             _updatedAt: serverTimestamp(),
