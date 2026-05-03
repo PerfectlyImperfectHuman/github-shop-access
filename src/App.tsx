@@ -17,7 +17,6 @@ import Suppliers from "./pages/Suppliers";
 import SupplierLedger from "./pages/SupplierLedger";
 import PinLock from "./pages/PinLock";
 import { initSettings } from "./lib/db";
-import { isPinSessionUnlocked } from "./lib/pinSession";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import type { Settings } from "./types";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -38,14 +37,13 @@ export default function App() {
     setupAutoBackup();
     initSettings().then((s) => {
       setSettings(s);
-      if (!s.shopType) setPhase("first_run");
-      else if (
-        s.pinEnabled &&
-        /^\d{4}$/.test(s.pinCode) &&
-        !isPinSessionUnlocked()
-      )
+      if (!s.shopType) {
+        setPhase("first_run");
+      } else if (s.pinEnabled && /^\d{4}$/.test(s.pinCode)) {
         setPhase("pin");
-      else setPhase("main");
+      } else {
+        setPhase("main");
+      }
     });
   }, []);
 
@@ -56,8 +54,7 @@ export default function App() {
   const handleFirstRunComplete = () => {
     initSettings().then((s) => {
       setSettings(s);
-      if (s.pinEnabled && /^\d{4}$/.test(s.pinCode) && !isPinSessionUnlocked())
-        setPhase("pin");
+      if (s.pinEnabled && /^\d{4}$/.test(s.pinCode)) setPhase("pin");
       else setPhase("main");
     });
   };
@@ -125,14 +122,14 @@ export default function App() {
                 <Route path="/customers/:id" element={<CustomerLedger />} />
                 <Route path="/suppliers" element={<Suppliers />} />
                 <Route path="/suppliers/:id" element={<SupplierLedger />} />
-                <Route path="/new-transaction" element={<NewTransaction />} />
                 <Route path="/transactions" element={<TransactionHistory />} />
+                <Route path="/cheques" element={<Cheques />} />
+                <Route path="/reports" element={<Reports />} />
+                <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/new-transaction" element={<NewTransaction />} />
                 <Route path="/products" element={<Products />} />
                 <Route path="/sale" element={<SaleReceipt />} />
-                <Route path="/reports" element={<Reports />} />
                 <Route path="/daily-close" element={<DailyClose />} />
-                <Route path="/settings" element={<SettingsPage />} />
-                <Route path="/cheques" element={<Cheques />} />
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

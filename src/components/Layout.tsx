@@ -30,7 +30,6 @@ interface NavItem {
   primary?: boolean;
 }
 
-// ─── Kiryana mode: simple khata-focused nav (no products, no POS, no scan) ──
 const karyanaNav: NavItem[] = [
   { to: "/", icon: LayoutDashboard, labelKey: "nav_home" },
   { to: "/customers", icon: Users, labelKey: "nav_customers" },
@@ -53,7 +52,6 @@ const karyanaBottomNav: NavItem[] = [
   { to: "/settings", icon: Settings, labelKey: "nav_settings" },
 ];
 
-// ─── Pro mode: full nav ─────────────────────────────────────────────────────
 const proNav: NavItem[] = [
   { to: "/", icon: LayoutDashboard, labelKey: "nav_dashboard" },
   { to: "/customers", icon: Users, labelKey: "nav_customers" },
@@ -99,12 +97,11 @@ export default function Layout() {
   }, []);
 
   useEffect(() => {
-    const sync = () => setOnline(navigator.onLine);
     const onOnline = () => setOnline(true);
     const onOffline = () => setOnline(false);
     window.addEventListener("online", onOnline);
     window.addEventListener("offline", onOffline);
-    sync();
+    setOnline(navigator.onLine);
     return () => {
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
@@ -121,6 +118,7 @@ export default function Layout() {
   const navItems = shopType === "kiryana" ? karyanaNav : proNav;
   const bottomNavItems =
     shopType === "kiryana" ? karyanaBottomNav : proBottomNav;
+
   const appName = t("app_name");
   const appSub =
     shopType === "kiryana" ? t("app_tagline_kiryana") : t("app_tagline_pro");
@@ -227,20 +225,24 @@ export default function Layout() {
               </NavLink>
             ))}
           </nav>
-          <div className="px-4 py-3 border-t border-sidebar-accent flex items-center justify-between">
-            <p className="text-[11px] text-sidebar-foreground/40">
-              {t("offline_footer")}
-            </p>
-            <button
-              onClick={toggleDark}
-              className="p-1.5 rounded-lg hover:bg-sidebar-accent transition text-sidebar-foreground/60"
-            >
-              {darkMode ? (
-                <Sun className="w-4 h-4" />
-              ) : (
-                <Moon className="w-4 h-4" />
-              )}
-            </button>
+
+          {/* Sidebar footer */}
+          <div className="px-4 py-3 border-t border-sidebar-accent">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] text-sidebar-foreground/40">
+                {t("offline_footer")}
+              </p>
+              <button
+                onClick={toggleDark}
+                className="p-1.5 rounded-lg hover:bg-sidebar-accent transition text-sidebar-foreground/60"
+              >
+                {darkMode ? (
+                  <Sun className="w-4 h-4" />
+                ) : (
+                  <Moon className="w-4 h-4" />
+                )}
+              </button>
+            </div>
           </div>
         </aside>
 
@@ -314,16 +316,18 @@ export default function Layout() {
                 {currentLabel}
               </h2>
             </div>
-            <button
-              onClick={toggleDark}
-              className="lg:hidden p-2 rounded-lg hover:bg-muted transition shrink-0"
-            >
-              {darkMode ? (
-                <Sun className="w-5 h-5 text-foreground" />
-              ) : (
-                <Moon className="w-5 h-5 text-foreground" />
-              )}
-            </button>
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                onClick={toggleDark}
+                className="lg:hidden p-2 rounded-lg hover:bg-muted transition shrink-0"
+              >
+                {darkMode ? (
+                  <Sun className="w-5 h-5 text-foreground" />
+                ) : (
+                  <Moon className="w-5 h-5 text-foreground" />
+                )}
+              </button>
+            </div>
           </header>
 
           <main className="flex-1 overflow-y-auto p-4 pb-24 lg:pb-6 lg:p-6">

@@ -14,6 +14,20 @@ import type {
   ChequeStatus,
 } from "@/types";
 
+// ── Sync queue record type ────────────────────────────────────────────────────
+
+export interface SyncQueueItem {
+  id: string; // composite: "{table}__{recordId}"
+  table: string;
+  recordId: string;
+  data: Record<string, unknown>;
+  op: "put" | "delete";
+  timestamp: number;
+  retries: number;
+}
+
+// ── Database ──────────────────────────────────────────────────────────────────
+
 class ShopDatabase extends Dexie {
   customers!: Table<Customer, string>;
   suppliers!: Table<Supplier, string>;
@@ -24,6 +38,7 @@ class ShopDatabase extends Dexie {
   kists!: Table<KistPlan, string>;
   kistInstallments!: Table<KistInstallment, string>;
   cheques!: Table<Cheque, string>;
+  syncQueue!: Table<SyncQueueItem, string>;
 
   constructor() {
     super("ShopManagementDB");
@@ -34,7 +49,7 @@ class ShopDatabase extends Dexie {
       settings: "id",
       products: "id, name, category, sku, isActive",
     });
-    // v3 — add suppliers, expenses, partyType + supplierId index
+    // v3 — add suppliers, expenses
     this.version(3)
       .stores({
         customers: "id, name, phone, isActive, createdAt, cnic",
@@ -78,15 +93,37 @@ class ShopDatabase extends Dexie {
       kistInstallments: "id, kistPlanId, customerId, dueDate, isPaid",
       cheques: "id, type, partyId, status, chequeDate, createdAt",
     });
+    // v6 — add syncQueue for offline-first sync
+    this.version(6).stores({
+      customers: "id, name, phone, isActive, createdAt, cnic",
+      suppliers: "id, name, phone, isActive, createdAt",
+      transactions:
+        "id, customerId, supplierId, partyType, type, date, createdAt, productId",
+      settings: "id",
+      products: "id, name, category, sku, isActive",
+      expenses: "id, date, category, createdAt",
+      kists: "id, customerId, status, createdAt",
+      kistInstallments: "id, kistPlanId, customerId, dueDate, isPaid",
+      cheques: "id, type, partyId, status, chequeDate, createdAt",
+      syncQueue: "id, table, timestamp",
+    });
   }
 }
 
 export const db = new ShopDatabase();
 
+// ── Lazy sync import (avoids circular deps at module load time) ───────────────
+// syncService imports db, so we import syncService lazily inside functions.
+
+async function getSyncService() {
+  return import("./syncService");
+}
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+
 export async function initSettings(): Promise<Settings> {
   const existing = await db.settings.get("default");
   if (existing) {
-    // Backfill new fields for users upgrading from v2
     const ex = existing as Partial<Settings> & Record<string, unknown>;
     const backfillPin = !("pinEnabled" in ex) || typeof ex.pinCode !== "string";
     const pinCode =
@@ -99,11 +136,17 @@ export async function initSettings(): Promise<Settings> {
       printerWidth: existing.printerWidth === "80mm" ? "80mm" : "58mm",
       pinEnabled: ex.pinEnabled === true,
       pinCode,
+      staffPinEnabled: ex.staffPinEnabled === true,
+      staffPin:
+        typeof ex.staffPin === "string" && /^\d{0,4}$/.test(ex.staffPin)
+          ? ex.staffPin
+          : "",
     };
     if (
       patched.printerWidth !== existing.printerWidth ||
       patched.language !== existing.language ||
-      backfillPin
+      backfillPin ||
+      !("staffPin" in ex) // ← add this
     ) {
       await db.settings.put(patched);
     }
@@ -125,12 +168,15 @@ export async function initSettings(): Promise<Settings> {
     printerWidth: "58mm",
     pinEnabled: false,
     pinCode: "",
+    staffPinEnabled: false,
+    staffPin: "",
   };
   await db.settings.put(defaults);
   return defaults;
 }
 
 // ─── Customers ─────────────────────────────────────────────────────────────────
+
 export async function addCustomer(
   c: Omit<Customer, "id" | "createdAt" | "updatedAt">,
 ): Promise<Customer> {
@@ -141,31 +187,49 @@ export async function addCustomer(
     createdAt: now,
     updatedAt: now,
   };
-  await db.customers.put(n);
+  const { syncPut } = await getSyncService();
+  await syncPut(
+    "customers",
+    n as unknown as Record<string, unknown> & { id: string },
+  );
   return n;
 }
+
 export async function updateCustomer(
   id: string,
   updates: Partial<Customer>,
 ): Promise<void> {
-  await db.customers.update(id, {
+  const existing = await db.customers.get(id);
+  if (!existing) return;
+  const updated: Customer = {
+    ...existing,
     ...updates,
     updatedAt: new Date().toISOString(),
-  });
+  };
+  const { syncPut } = await getSyncService();
+  await syncPut(
+    "customers",
+    updated as unknown as Record<string, unknown> & { id: string },
+  );
 }
+
 export async function deleteCustomer(id: string): Promise<void> {
-  await db.transaction("rw", db.customers, db.transactions, async () => {
-    await db.transactions.where("customerId").equals(id).delete();
-    await db.customers.delete(id);
-  });
+  const { syncDelete } = await getSyncService();
+  // Delete related transactions locally (they'll sync separately)
+  const txns = await db.transactions.where("customerId").equals(id).toArray();
+  await Promise.all(txns.map((t) => syncDelete("transactions", t.id)));
+  await syncDelete("customers", id);
 }
+
 export async function getCustomers(activeOnly = false): Promise<Customer[]> {
   const all = await db.customers.toArray();
   return activeOnly ? all.filter((c) => c.isActive) : all;
 }
+
 export async function getCustomer(id: string): Promise<Customer | undefined> {
   return db.customers.get(id);
 }
+
 export async function getCustomerBalance(customerId: string): Promise<number> {
   const txns = await db.transactions
     .where("customerId")
@@ -179,6 +243,7 @@ export async function getCustomerBalance(customerId: string): Promise<number> {
 }
 
 // ─── Suppliers ─────────────────────────────────────────────────────────────────
+
 export async function addSupplier(
   s: Omit<Supplier, "id" | "createdAt" | "updatedAt">,
 ): Promise<Supplier> {
@@ -189,31 +254,48 @@ export async function addSupplier(
     createdAt: now,
     updatedAt: now,
   };
-  await db.suppliers.put(n);
+  const { syncPut } = await getSyncService();
+  await syncPut(
+    "suppliers",
+    n as unknown as Record<string, unknown> & { id: string },
+  );
   return n;
 }
+
 export async function updateSupplier(
   id: string,
   updates: Partial<Supplier>,
 ): Promise<void> {
-  await db.suppliers.update(id, {
+  const existing = await db.suppliers.get(id);
+  if (!existing) return;
+  const updated: Supplier = {
+    ...existing,
     ...updates,
     updatedAt: new Date().toISOString(),
-  });
+  };
+  const { syncPut } = await getSyncService();
+  await syncPut(
+    "suppliers",
+    updated as unknown as Record<string, unknown> & { id: string },
+  );
 }
+
 export async function deleteSupplier(id: string): Promise<void> {
-  await db.transaction("rw", db.suppliers, db.transactions, async () => {
-    await db.transactions.where("supplierId").equals(id).delete();
-    await db.suppliers.delete(id);
-  });
+  const { syncDelete } = await getSyncService();
+  const txns = await db.transactions.where("supplierId").equals(id).toArray();
+  await Promise.all(txns.map((t) => syncDelete("transactions", t.id)));
+  await syncDelete("suppliers", id);
 }
+
 export async function getSuppliers(activeOnly = false): Promise<Supplier[]> {
   const all = await db.suppliers.toArray();
   return activeOnly ? all.filter((s) => s.isActive) : all;
 }
+
 export async function getSupplier(id: string): Promise<Supplier | undefined> {
   return db.suppliers.get(id);
 }
+
 export async function getSupplierBalance(supplierId: string): Promise<number> {
   const [supplier, txns] = await Promise.all([
     db.suppliers.get(supplierId),
@@ -226,6 +308,7 @@ export async function getSupplierBalance(supplierId: string): Promise<number> {
     return bal;
   }, opening);
 }
+
 export async function getSupplierTransactions(
   supplierId: string,
 ): Promise<Transaction[]> {
@@ -237,6 +320,7 @@ export async function getSupplierTransactions(
 }
 
 // ─── Products ──────────────────────────────────────────────────────────────────
+
 export async function addProduct(
   p: Omit<Product, "id" | "createdAt" | "updatedAt">,
 ): Promise<Product> {
@@ -247,41 +331,66 @@ export async function addProduct(
     createdAt: now,
     updatedAt: now,
   };
-  await db.products.put(n);
+  const { syncPut } = await getSyncService();
+  await syncPut(
+    "products",
+    n as unknown as Record<string, unknown> & { id: string },
+  );
   return n;
 }
+
 export async function updateProduct(
   id: string,
   updates: Partial<Product>,
 ): Promise<void> {
-  await db.products.update(id, {
+  const existing = await db.products.get(id);
+  if (!existing) return;
+  const updated: Product = {
+    ...existing,
     ...updates,
     updatedAt: new Date().toISOString(),
-  });
+  };
+  const { syncPut } = await getSyncService();
+  await syncPut(
+    "products",
+    updated as unknown as Record<string, unknown> & { id: string },
+  );
 }
+
 export async function deleteProduct(id: string): Promise<void> {
-  await db.products.delete(id);
+  const { syncDelete } = await getSyncService();
+  await syncDelete("products", id);
 }
+
 export async function getProducts(activeOnly = false): Promise<Product[]> {
   const all = await db.products.toArray();
   return activeOnly ? all.filter((p) => p.isActive) : all;
 }
+
 export async function getProduct(id: string): Promise<Product | undefined> {
   return db.products.get(id);
 }
+
 export async function updateProductStock(
   id: string,
   delta: number,
 ): Promise<void> {
   const p = await db.products.get(id);
-  if (p)
-    await db.products.update(id, {
-      stock: Math.max(0, p.stock + delta),
-      updatedAt: new Date().toISOString(),
-    });
+  if (!p) return;
+  const updated: Product = {
+    ...p,
+    stock: Math.max(0, p.stock + delta),
+    updatedAt: new Date().toISOString(),
+  };
+  const { syncPut } = await getSyncService();
+  await syncPut(
+    "products",
+    updated as unknown as Record<string, unknown> & { id: string },
+  );
 }
 
 // ─── Transactions ──────────────────────────────────────────────────────────────
+
 export async function addTransaction(
   txn: Omit<Transaction, "id" | "createdAt">,
 ): Promise<Transaction> {
@@ -296,28 +405,34 @@ export async function addTransaction(
     id: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
   };
-  await db.transactions.put(n);
+  const { syncPut } = await getSyncService();
+  await syncPut(
+    "transactions",
+    n as unknown as Record<string, unknown> & { id: string },
+  );
   if (txn.productId && txn.quantity && txn.type === "credit") {
     await updateProductStock(txn.productId, -txn.quantity);
   }
   if (txn.productId && txn.quantity && txn.type === "purchase") {
-    // Buying from supplier increases our stock
     await updateProductStock(txn.productId, txn.quantity);
   }
   return n;
 }
+
 export async function deleteTransaction(id: string): Promise<void> {
   const txn = await db.transactions.get(id);
-  if (txn) {
-    if (txn.productId && txn.quantity && txn.type === "credit")
-      await updateProductStock(txn.productId, txn.quantity);
-    if (txn.productId && txn.quantity && txn.type === "sale")
-      await updateProductStock(txn.productId, txn.quantity);
-    if (txn.productId && txn.quantity && txn.type === "purchase")
-      await updateProductStock(txn.productId, -txn.quantity);
-    await db.transactions.delete(id);
-  }
+  if (!txn) return;
+  // Reverse stock effects before deleting
+  if (txn.productId && txn.quantity && txn.type === "credit")
+    await updateProductStock(txn.productId, txn.quantity);
+  if (txn.productId && txn.quantity && txn.type === "sale")
+    await updateProductStock(txn.productId, txn.quantity);
+  if (txn.productId && txn.quantity && txn.type === "purchase")
+    await updateProductStock(txn.productId, -txn.quantity);
+  const { syncDelete } = await getSyncService();
+  await syncDelete("transactions", id);
 }
+
 export async function getTransactions(
   customerId?: string,
 ): Promise<Transaction[]> {
@@ -331,6 +446,7 @@ export async function getTransactions(
 }
 
 // ─── Expenses ──────────────────────────────────────────────────────────────────
+
 export async function addExpense(
   e: Omit<Expense, "id" | "createdAt">,
 ): Promise<Expense> {
@@ -339,15 +455,23 @@ export async function addExpense(
     id: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
   };
-  await db.expenses.put(n);
+  const { syncPut } = await getSyncService();
+  await syncPut(
+    "expenses",
+    n as unknown as Record<string, unknown> & { id: string },
+  );
   return n;
 }
+
 export async function deleteExpense(id: string): Promise<void> {
-  await db.expenses.delete(id);
+  const { syncDelete } = await getSyncService();
+  await syncDelete("expenses", id);
 }
+
 export async function getExpenses(): Promise<Expense[]> {
   return db.expenses.reverse().sortBy("date");
 }
+
 export async function getExpensesByDate(dateStr: string): Promise<Expense[]> {
   const start = new Date(dateStr);
   start.setHours(0, 0, 0, 0);
@@ -361,6 +485,7 @@ export async function getExpensesByDate(dateStr: string): Promise<Expense[]> {
 }
 
 // ─── Aggregates ────────────────────────────────────────────────────────────────
+
 export async function getDashboardStats() {
   const [customers, transactions, products, suppliers] = await Promise.all([
     db.customers.toArray(),
@@ -376,7 +501,6 @@ export async function getDashboardStats() {
     .filter((t) => t.type === "payment")
     .reduce((s, t) => s + t.amount, 0);
 
-  // Supplier outstanding (we owe them)
   let supplierOutstanding = 0;
   for (const s of suppliers) {
     const opening = s.openingBalance || 0;
@@ -473,6 +597,7 @@ export async function getDailySummary(dateStr: string): Promise<DailySummary> {
 }
 
 // ─── Backup ────────────────────────────────────────────────────────────────────
+
 export async function exportData(): Promise<string> {
   const [customers, suppliers, transactions, settings, products, expenses] =
     await Promise.all([
@@ -556,7 +681,6 @@ export async function addKistPlan(
     createdAt: now,
   };
 
-  // Generate installment schedule
   const installments: KistInstallment[] = Array.from(
     { length: plan.totalInstallments },
     (_, i) => {
@@ -565,7 +689,6 @@ export async function addKistPlan(
       if (plan.frequency === "biweekly") due.setDate(due.getDate() + i * 14);
       if (plan.frequency === "monthly") due.setMonth(due.getMonth() + i);
 
-      // Last installment absorbs any rounding difference
       const isLast = i === plan.totalInstallments - 1;
       const paidSoFar = plan.installmentAmount * i;
       const amount = isLast
@@ -585,10 +708,19 @@ export async function addKistPlan(
     },
   );
 
-  await db.transaction("rw", [db.kists, db.kistInstallments], async () => {
-    await db.kists.put(newPlan);
-    await db.kistInstallments.bulkPut(installments);
-  });
+  const { syncPut } = await getSyncService();
+  await syncPut(
+    "kists",
+    newPlan as unknown as Record<string, unknown> & { id: string },
+  );
+  await Promise.all(
+    installments.map((inst) =>
+      syncPut(
+        "kistInstallments",
+        inst as unknown as Record<string, unknown> & { id: string },
+      ),
+    ),
+  );
 
   return newPlan;
 }
@@ -613,35 +745,54 @@ export async function markInstallmentPaid(
     createdAt: now,
   };
 
-  await db.transaction(
-    "rw",
-    [db.kists, db.kistInstallments, db.transactions],
-    async () => {
-      await db.kistInstallments.update(installmentId, {
-        isPaid: true,
-        paidDate: now,
-        transactionId: txnId,
-      });
-      await db.transactions.put(paymentTxn);
-      const plan = await db.kists.get(inst.kistPlanId);
-      if (plan) {
-        const newPaid = plan.paidInstallments + 1;
-        const newStatus: KistStatus =
-          newPaid >= plan.totalInstallments ? "completed" : "active";
-        await db.kists.update(plan.id, {
-          paidInstallments: newPaid,
-          status: newStatus,
-        });
-      }
-    },
+  const { syncPut } = await getSyncService();
+
+  // Update installment
+  const updatedInst: KistInstallment = {
+    ...inst,
+    isPaid: true,
+    paidDate: now,
+    transactionId: txnId,
+  };
+  await syncPut(
+    "kistInstallments",
+    updatedInst as unknown as Record<string, unknown> & { id: string },
   );
+
+  // Add payment transaction
+  await syncPut(
+    "transactions",
+    paymentTxn as unknown as Record<string, unknown> & { id: string },
+  );
+
+  // Update plan progress
+  const plan = await db.kists.get(inst.kistPlanId);
+  if (plan) {
+    const newPaid = plan.paidInstallments + 1;
+    const newStatus: KistStatus =
+      newPaid >= plan.totalInstallments ? "completed" : "active";
+    const updatedPlan: KistPlan = {
+      ...plan,
+      paidInstallments: newPaid,
+      status: newStatus,
+    };
+    await syncPut(
+      "kists",
+      updatedPlan as unknown as Record<string, unknown> & { id: string },
+    );
+  }
 }
 
 export async function deleteKistPlan(planId: string): Promise<void> {
-  await db.transaction("rw", [db.kists, db.kistInstallments], async () => {
-    await db.kistInstallments.where("kistPlanId").equals(planId).delete();
-    await db.kists.delete(planId);
-  });
+  const { syncDelete } = await getSyncService();
+  const installments = await db.kistInstallments
+    .where("kistPlanId")
+    .equals(planId)
+    .toArray();
+  await Promise.all(
+    installments.map((i) => syncDelete("kistInstallments", i.id)),
+  );
+  await syncDelete("kists", planId);
 }
 
 export async function getOverdueInstallments(): Promise<KistInstallment[]> {
@@ -663,7 +814,11 @@ export async function addCheque(
     createdAt: now,
     updatedAt: now,
   };
-  await db.cheques.put(cheque);
+  const { syncPut } = await getSyncService();
+  await syncPut(
+    "cheques",
+    cheque as unknown as Record<string, unknown> & { id: string },
+  );
   return cheque;
 }
 
@@ -671,55 +826,68 @@ export async function updateChequeStatus(
   id: string,
   status: ChequeStatus,
 ): Promise<void> {
-  await db.cheques.update(id, { status, updatedAt: new Date().toISOString() });
+  const existing = await db.cheques.get(id);
+  if (!existing) return;
+  const updated: Cheque = {
+    ...existing,
+    status,
+    updatedAt: new Date().toISOString(),
+  };
+  const { syncPut } = await getSyncService();
+  await syncPut(
+    "cheques",
+    updated as unknown as Record<string, unknown> & { id: string },
+  );
 }
 
-/** Mark cheque as cleared and auto-create a payment/supplier_payment transaction. */
 export async function clearCheque(chequeId: string): Promise<void> {
   const cheque = await db.cheques.get(chequeId);
   if (!cheque || cheque.status === "cleared") return;
 
   const now = new Date().toISOString();
   const txnId = crypto.randomUUID();
+  const { syncPut } = await getSyncService();
 
-  await db.transaction("rw", [db.cheques, db.transactions], async () => {
-    if (cheque.partyId) {
-      if (cheque.type === "received" && cheque.partyType === "customer") {
-        // Customer paid via cheque → payment reduces their balance
-        await db.transactions.put({
-          id: txnId,
-          customerId: cheque.partyId,
-          partyType: "customer",
-          type: "payment",
-          amount: cheque.amount,
-          description: `Cheque cleared — #${cheque.chequeNo} (${cheque.bankName})`,
-          date: now,
-          createdAt: now,
-        } as Transaction);
-      } else if (cheque.type === "issued" && cheque.partyType === "supplier") {
-        // We paid supplier via cheque → supplier_payment reduces what we owe
-        await db.transactions.put({
-          id: txnId,
-          customerId: "",
-          supplierId: cheque.partyId,
-          partyType: "supplier",
-          type: "supplier_payment",
-          amount: cheque.amount,
-          description: `Cheque cleared — #${cheque.chequeNo} (${cheque.bankName})`,
-          date: now,
-          createdAt: now,
-        } as Transaction);
-      }
+  if (cheque.partyId) {
+    if (cheque.type === "received" && cheque.partyType === "customer") {
+      await syncPut("transactions", {
+        id: txnId,
+        customerId: cheque.partyId,
+        partyType: "customer",
+        type: "payment",
+        amount: cheque.amount,
+        description: `Cheque cleared — #${cheque.chequeNo} (${cheque.bankName})`,
+        date: now,
+        createdAt: now,
+      } as unknown as Record<string, unknown> & { id: string });
+    } else if (cheque.type === "issued" && cheque.partyType === "supplier") {
+      await syncPut("transactions", {
+        id: txnId,
+        customerId: "",
+        supplierId: cheque.partyId,
+        partyType: "supplier",
+        type: "supplier_payment",
+        amount: cheque.amount,
+        description: `Cheque cleared — #${cheque.chequeNo} (${cheque.bankName})`,
+        date: now,
+        createdAt: now,
+      } as unknown as Record<string, unknown> & { id: string });
     }
+  }
 
-    await db.cheques.update(chequeId, {
-      status: "cleared",
-      clearedTransactionId: cheque.partyId ? txnId : undefined,
-      updatedAt: now,
-    });
-  });
+  const updatedCheque: Cheque = {
+    ...cheque,
+    status: "cleared",
+    clearedTransactionId: cheque.partyId ? txnId : undefined,
+    updatedAt: now,
+  };
+  await syncPut(
+    "cheques",
+    updatedCheque as unknown as Record<string, unknown> & { id: string },
+  );
 }
 
 export async function deleteCheque(id: string): Promise<void> {
-  await db.cheques.delete(id);
+  const { syncDelete } = await getSyncService();
+  await syncDelete("cheques", id);
 }

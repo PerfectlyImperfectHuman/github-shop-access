@@ -21,7 +21,6 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { initSettings, exportData, importData, db } from "@/lib/db";
-import { clearPinSession } from "@/lib/pinSession";
 import { PinNumpad, PinDots } from "@/pages/PinLock";
 import { cn } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -29,17 +28,25 @@ import { AccountModal } from "@/components/AccountModal";
 import { toast } from "sonner";
 import { useT, useLanguage } from "@/contexts/LanguageContext";
 import {
-  signOutAndClear,
+  signOutAccount,
   onAuthChange,
   getCurrentUser,
+  formatPakistaniPhone,
+} from "@/lib/authService";
+import {
   backupToCloud,
   restoreFromCloud,
   getCloudBackupInfo,
-  fromInternationalPhone,
-  rotateRecoveryCode,
 } from "@/lib/cloudBackup";
 import type { User } from "firebase/auth";
 import type { Settings } from "@/types";
+
+/** Convert stored email (03001234567@bahi.app) back to display format */
+function emailToDisplayPhone(email: string | null | undefined): string {
+  if (!email) return "";
+  const digits = email.replace("@bahi.app", "");
+  return formatPakistaniPhone(digits);
+}
 
 export default function SettingsPage() {
   const t = useT();
@@ -131,8 +138,7 @@ export default function SettingsPage() {
       (prev.pinCode !== settings.pinCode ||
         prev.pinEnabled !== settings.pinEnabled)
     )
-      clearPinSession();
-    setSaving(false);
+      setSaving(false);
     toast.success(t("settings_saved"));
   }
 
@@ -196,7 +202,8 @@ export default function SettingsPage() {
   }
 
   async function handleCloudSignOut() {
-    await signOutAndClear(cloudUser?.phoneNumber ?? "");
+    const phone = cloudUser?.email?.replace("@bahi.app", "") ?? "";
+    await signOutAccount(phone);
     setBackupInfo(null);
     toast.success("Cloud backup disconnected.");
   }
@@ -598,7 +605,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* ── Cloud Backup ──────────────────────────────────────────────── */}
+      {/* ── Cloud Backup ── */}
       <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
         <div className="flex items-center gap-3 mb-2">
           <div className="p-2 rounded-lg bg-primary/10">
@@ -619,7 +626,6 @@ export default function SettingsPage() {
         </div>
 
         {!cloudUser ? (
-          // ── Signed out state ──
           <div className="mt-4 space-y-3">
             <div className="p-3 bg-warning/10 rounded-lg flex items-start gap-2">
               <Info className="w-4 h-4 text-warning shrink-0 mt-0.5" />
@@ -629,7 +635,6 @@ export default function SettingsPage() {
               </p>
             </div>
 
-            {/* Phone auth button — trustworthy design */}
             <button
               onClick={() => setShowPhoneModal(true)}
               className="w-full flex items-center gap-4 px-4 py-3.5 bg-card border-2 border-primary/20 hover:border-primary/40 rounded-xl transition group shadow-sm"
@@ -652,7 +657,7 @@ export default function SettingsPage() {
                   Phone number se connect karein
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  SMS OTP se verify karein — free, fast, secure
+                  PIN se secure — free, fast, koi SMS nahi
                 </p>
               </div>
               <svg
@@ -668,48 +673,29 @@ export default function SettingsPage() {
               </svg>
             </button>
 
-            {/* Trust indicators */}
             <div className="flex items-center justify-center gap-4 pt-1">
-              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                <svg
-                  className="w-3 h-3 text-success"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                >
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                Firebase Secured
-              </div>
-              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                <svg
-                  className="w-3 h-3 text-success"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                >
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                Auto-backup
-              </div>
-              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                <svg
-                  className="w-3 h-3 text-success"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                >
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                Cross-device sync
-              </div>
+              {["Firebase Secured", "Auto-backup", "Cross-device sync"].map(
+                (label) => (
+                  <div
+                    key={label}
+                    className="flex items-center gap-1.5 text-[10px] text-muted-foreground"
+                  >
+                    <svg
+                      className="w-3 h-3 text-success"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                    >
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    {label}
+                  </div>
+                ),
+              )}
             </div>
           </div>
         ) : (
-          // ── Signed in state ──
           <div className="mt-4 space-y-3">
             <div className="flex items-center gap-3 p-3.5 bg-success/8 border border-success/20 rounded-xl">
               <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center shrink-0">
@@ -727,9 +713,7 @@ export default function SettingsPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-card-foreground">
-                  {cloudUser.phoneNumber
-                    ? fromInternationalPhone(cloudUser.phoneNumber)
-                    : (cloudUser.email ?? "Connected")}
+                  {emailToDisplayPhone(cloudUser.email)}
                 </p>
                 <p className="text-xs text-success font-medium">
                   Cloud backup active ✓
@@ -791,8 +775,7 @@ export default function SettingsPage() {
         )}
       </div>
 
-      {/* ── Local Backup ──────────────────────────────────────────────── */}
-      {/* Data Backup */}
+      {/* ── Local Backup ── */}
       <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
         <div className="flex items-center gap-3 mb-2">
           <div className="p-2 rounded-lg bg-primary/10">

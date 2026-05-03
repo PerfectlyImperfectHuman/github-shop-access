@@ -19,7 +19,7 @@ export interface Supplier {
   address: string;
   notes: string;
   isActive: boolean;
-  openingBalance: number; // amount we owe at start (positive = we owe them)
+  openingBalance: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -48,9 +48,9 @@ export type TransactionType =
 
 export interface Transaction {
   id: string;
-  customerId: string; // empty for supplier txns and pure cash sales
-  supplierId?: string; // set when partyType === "supplier"
-  partyType?: "customer" | "supplier"; // defaults to "customer" for legacy data
+  customerId: string;
+  supplierId?: string;
+  partyType?: "customer" | "supplier";
   type: TransactionType;
   amount: number;
   description: string;
@@ -63,7 +63,7 @@ export interface Transaction {
 export interface Expense {
   id: string;
   date: string;
-  category: string; // bijli, pani, safai, kiraya, transport, other
+  category: string;
   amount: number;
   note: string;
   createdAt: string;
@@ -83,9 +83,7 @@ export interface Settings {
   receiptFooter: string;
   shopType: "kiryana" | "pro" | "";
   printerWidth: "58mm" | "80mm";
-  /** When true and pinCode is 4 digits, show PIN gate until sessionStorage unlock. */
   pinEnabled: boolean;
-  /** Four-digit PIN (digits only). Empty when lock disabled or not yet set. */
   pinCode: string;
 }
 
@@ -96,11 +94,11 @@ export interface KistPlan {
   id: string;
   customerId: string;
   totalAmount: number;
-  installmentAmount: number; // per installment (may differ for last one due to rounding)
+  installmentAmount: number;
   totalInstallments: number;
   paidInstallments: number;
   frequency: KistFrequency;
-  startDate: string; // ISO — date of FIRST installment
+  startDate: string;
   description: string;
   status: KistStatus;
   createdAt: string;
@@ -110,12 +108,12 @@ export interface KistInstallment {
   id: string;
   kistPlanId: string;
   customerId: string;
-  installmentNumber: number; // 1-based
-  dueDate: string; // ISO
+  installmentNumber: number;
+  dueDate: string;
   amount: number;
   isPaid: boolean;
   paidDate?: string;
-  transactionId?: string; // linked payment transaction id
+  transactionId?: string;
   createdAt: string;
 }
 
@@ -129,17 +127,17 @@ export type ChequeType = "received" | "issued";
 
 export interface Cheque {
   id: string;
-  type: ChequeType; // received from customer / issued to supplier
-  partyName: string; // denormalized name for easy display
-  partyId?: string; // customer or supplier id (if linked)
+  type: ChequeType;
+  partyName: string;
+  partyId?: string;
   partyType?: "customer" | "supplier" | "other";
   amount: number;
-  chequeNo: string; // cheque number printed on cheque
-  bankName: string; // bank name
-  chequeDate: string; // ISO — date written on cheque (often post-dated)
+  chequeNo: string;
+  bankName: string;
+  chequeDate: string;
   status: ChequeStatus;
   notes: string;
-  clearedTransactionId?: string; // transaction auto-created on clear
+  clearedTransactionId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -149,9 +147,9 @@ export interface DailySummary {
   cashSales: number;
   creditGiven: number;
   paymentsReceived: number;
-  purchases: number; // ulta udhar received from suppliers
-  supplierPayments: number; // money paid to suppliers
-  expenses: number; // daily expenses
+  purchases: number;
+  supplierPayments: number;
+  expenses: number;
   salesCount: number;
   creditCount: number;
   paymentCount: number;

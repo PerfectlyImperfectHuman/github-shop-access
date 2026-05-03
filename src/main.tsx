@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
+import { registerServiceWorker } from "./lib/registerSW";
 
 // Register service worker for PWA (offline support + home screen install)
 if ("serviceWorker" in navigator) {
@@ -14,7 +15,10 @@ if ("serviceWorker" in navigator) {
           const newWorker = reg.installing;
           if (newWorker) {
             newWorker.addEventListener("statechange", () => {
-              if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+              if (
+                newWorker.state === "installed" &&
+                navigator.serviceWorker.controller
+              ) {
                 // New content available — could show a toast here
                 console.log("New SW version available");
               }
@@ -26,8 +30,10 @@ if ("serviceWorker" in navigator) {
   });
 }
 
+registerServiceWorker();
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <App />
-  </React.StrictMode>
+  </React.StrictMode>,
 );

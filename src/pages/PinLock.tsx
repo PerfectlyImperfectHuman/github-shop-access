@@ -4,7 +4,6 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { cn } from "@/lib/utils";
-import { setPinSessionUnlocked } from "@/lib/pinSession";
 
 const DIGITS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"] as const;
 
@@ -16,7 +15,9 @@ export function PinDots({ filled, max = 4 }: { filled: number; max?: number }) {
           key={i}
           className={cn(
             "h-3.5 w-3.5 rounded-full border-2 transition-colors",
-            i < filled ? "border-primary bg-primary" : "border-muted-foreground/35 bg-transparent",
+            i < filled
+              ? "border-primary bg-primary"
+              : "border-muted-foreground/35 bg-transparent",
           )}
         />
       ))}
@@ -35,7 +36,7 @@ export function PinNumpad({
 }) {
   return (
     <div className="grid max-w-[280px] grid-cols-3 gap-2 mx-auto">
-      {DIGITS.map(d => (
+      {DIGITS.map((d) => (
         <button
           key={d}
           type="button"
@@ -82,7 +83,6 @@ export default function PinLock({ expectedPin, onSuccess }: PinLockProps) {
     (next: string) => {
       if (next.length < 4) return;
       if (next === expectedPin) {
-        setPinSessionUnlocked();
         onSuccess();
       } else {
         toast.error(t("pin_wrong"));
@@ -101,7 +101,7 @@ export default function PinLock({ expectedPin, onSuccess }: PinLockProps) {
     if (next.length === 4) tryComplete(next);
   };
 
-  const onBackspace = () => setPin(s => s.slice(0, -1));
+  const onBackspace = () => setPin((s) => s.slice(0, -1));
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background px-6 py-12">
@@ -114,12 +114,13 @@ export default function PinLock({ expectedPin, onSuccess }: PinLockProps) {
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/15 border border-primary/20">
             <Lock className="w-8 h-8 text-primary" />
           </div>
-          <h1 className="font-display text-xl font-bold text-foreground">{t("pin_lock_title")}</h1>
+          <h1 className="font-display text-xl font-bold text-foreground">
+            {t("pin_lock_title")}
+          </h1>
           <p className="text-sm text-muted-foreground">{t("pin_enter")}</p>
         </div>
 
         <PinDots filled={pin.length} />
-
         <PinNumpad onDigit={onDigit} onBackspace={onBackspace} />
       </motion.div>
     </div>
