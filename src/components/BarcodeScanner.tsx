@@ -7,7 +7,14 @@
  * Also validates digit count for EAN-13/EAN-8/UPC-A before accepting.
  */
 import { useEffect, useRef, useState, useCallback } from "react";
-import { X, Camera, Keyboard, RefreshCw, ZapOff, CheckCircle2 } from "lucide-react";
+import {
+  X,
+  Camera,
+  Keyboard,
+  RefreshCw,
+  ZapOff,
+  CheckCircle2,
+} from "lucide-react";
 
 interface BarcodeScannerProps {
   onScan: (code: string) => void;
@@ -16,7 +23,9 @@ interface BarcodeScannerProps {
 
 declare class BarcodeDetector {
   constructor(options?: { formats: string[] });
-  detect(source: HTMLVideoElement | HTMLCanvasElement | ImageBitmap): Promise<Array<{ rawValue: string; format: string }>>;
+  detect(
+    source: HTMLVideoElement | HTMLCanvasElement | ImageBitmap,
+  ): Promise<Array<{ rawValue: string; format: string }>>;
   static getSupportedFormats(): Promise<string[]>;
 }
 
@@ -37,8 +46,8 @@ function isLikelyValidBarcode(code: string, format?: string): boolean {
   // For digit-only formats, enforce exact lengths
   if (/^\d+$/.test(trimmed)) {
     if (format === "ean_13" && trimmed.length !== 13) return false;
-    if (format === "ean_8"  && trimmed.length !== 8)  return false;
-    if (format === "upc_a"  && trimmed.length !== 12) return false;
+    if (format === "ean_8" && trimmed.length !== 8) return false;
+    if (format === "upc_a" && trimmed.length !== 12) return false;
     // Generic digit string — must be at least 6 digits
     if (trimmed.length < 6) return false;
   } else {
@@ -49,29 +58,30 @@ function isLikelyValidBarcode(code: string, format?: string): boolean {
 }
 
 export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
-  const videoRef   = useRef<HTMLVideoElement>(null);
-  const streamRef  = useRef<MediaStream | null>(null);
-  const rafRef     = useRef<number>(0);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const rafRef = useRef<number>(0);
 
   // Confirmation buffer: we require the SAME value twice before firing
-  const lastSeenRef      = useRef<string>("");
-  const confirmCountRef  = useRef<number>(0);
-  const CONFIRM_NEEDED   = 2; // detections in a row required
-  const RESCAN_DELAY_MS  = 2500; // cooldown after a successful scan
+  const lastSeenRef = useRef<string>("");
+  const confirmCountRef = useRef<number>(0);
+  const CONFIRM_NEEDED = 2; // detections in a row required
+  const RESCAN_DELAY_MS = 2500; // cooldown after a successful scan
 
-  const [mode, setMode]           = useState<"camera" | "manual">(
-    isBarcodeDetectorSupported() ? "camera" : "manual"
+  const [mode, setMode] = useState<"camera" | "manual">(
+    isBarcodeDetectorSupported() ? "camera" : "manual",
   );
   const [cameraError, setCameraError] = useState("");
-  const [manualCode, setManualCode]   = useState("");
-  const [scanning, setScanning]       = useState(false);
-  const [confirmed, setConfirmed]     = useState("");   // last confirmed scan (for UI flash)
-  const [cooldown, setCooldown]       = useState(false); // prevent re-fire during delay
+  const [manualCode, setManualCode] = useState("");
+  const [scanning, setScanning] = useState(false);
+  const [confirmed, setConfirmed] = useState(""); // last confirmed scan (for UI flash)
+  const [cooldown, setCooldown] = useState(false); // UI only — read cooldownRef inside scan loop
+  const cooldownRef = useRef(false); // always-current cooldown for the scan closure
 
   const stopCamera = useCallback(() => {
     cancelAnimationFrame(rafRef.current);
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
   }, []);
@@ -80,12 +90,16 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
     setCameraError("");
     setScanning(false);
     setConfirmed("");
-    lastSeenRef.current     = "";
+    lastSeenRef.current = "";
     confirmCountRef.current = 0;
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: {
+          facingMode: "environment",
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
       });
       streamRef.current = stream;
       if (videoRef.current) {
@@ -94,7 +108,17 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
       }
 
       const detector = new BarcodeDetector({
-        formats: ["ean_13", "ean_8", "code_128", "code_39", "qr_code", "upc_a", "upc_e", "itf", "codabar"],
+        formats: [
+          "ean_13",
+          "ean_8",
+          "code_128",
+          "code_39",
+          "qr_code",
+          "upc_a",
+          "upc_e",
+          "itf",
+          "codabar",
+        ],
       });
       setScanning(true);
 
@@ -104,7 +128,7 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
           return;
         }
 
-        if (!cooldown) {
+        if (!cooldownRef.current) {
           try {
             const barcodes = await detector.detect(videoRef.current);
             if (barcodes.length > 0) {
@@ -121,10 +145,12 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
                     lastSeenRef.current = "";
                     if ("vibrate" in navigator) navigator.vibrate(120);
                     setConfirmed(code);
+                    cooldownRef.current = true;
                     setCooldown(true);
                     onScan(code);
                     setTimeout(() => {
                       setConfirmed("");
+                      cooldownRef.current = false;
                       setCooldown(false);
                     }, RESCAN_DELAY_MS);
                   }
@@ -158,19 +184,21 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes("Permission") || msg.includes("NotAllowed")) {
-        setCameraError("Camera permission denied. Please allow camera access in your browser settings.");
+        setCameraError(
+          "Camera permission denied. Please allow camera access in your browser settings.",
+        );
       } else if (msg.includes("NotFound") || msg.includes("DevicesNotFound")) {
         setCameraError("No camera found on this device.");
       } else {
         setCameraError("Could not start camera: " + msg);
       }
     }
-  }, [onScan, cooldown]);
+  }, [onScan]);
 
   useEffect(() => {
     if (mode === "camera" && isBarcodeDetectorSupported()) startCamera();
     return () => stopCamera();
-  }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mode, startCamera, stopCamera]);
 
   function handleManualSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -184,30 +212,42 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
   const confidence = Math.min(confirmCountRef.current / CONFIRM_NEEDED, 1);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
       <div
         className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h2 className="font-display font-semibold text-card-foreground">Scan Barcode</h2>
+          <h2 className="font-display font-semibold text-card-foreground">
+            Scan Barcode
+          </h2>
           <div className="flex items-center gap-2">
             {isBarcodeDetectorSupported() && (
               <>
-                <button onClick={() => setMode("camera")}
+                <button
+                  onClick={() => setMode("camera")}
                   className={`p-1.5 rounded-lg transition text-sm flex items-center gap-1 ${mode === "camera" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground"}`}
-                  title="Camera mode">
+                  title="Camera mode"
+                >
                   <Camera className="w-4 h-4" />
                 </button>
-                <button onClick={() => setMode("manual")}
+                <button
+                  onClick={() => setMode("manual")}
                   className={`p-1.5 rounded-lg transition ${mode === "manual" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground"}`}
-                  title="Manual entry">
+                  title="Manual entry"
+                >
                   <Keyboard className="w-4 h-4" />
                 </button>
               </>
             )}
-            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition">
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition"
+            >
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -221,10 +261,16 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
                 <ZapOff className="w-10 h-10 mx-auto text-muted-foreground/40" />
                 <p className="text-sm text-muted-foreground">{cameraError}</p>
                 <div className="flex gap-2 justify-center">
-                  <button onClick={startCamera} className="px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium flex items-center gap-1.5">
+                  <button
+                    onClick={startCamera}
+                    className="px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium flex items-center gap-1.5"
+                  >
                     <RefreshCw className="w-3.5 h-3.5" /> Retry
                   </button>
-                  <button onClick={() => setMode("manual")} className="px-3 py-2 bg-secondary text-secondary-foreground rounded-lg text-sm font-medium">
+                  <button
+                    onClick={() => setMode("manual")}
+                    className="px-3 py-2 bg-secondary text-secondary-foreground rounded-lg text-sm font-medium"
+                  >
                     Type manually
                   </button>
                 </div>
@@ -232,7 +278,13 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
             ) : (
               <>
                 <div className="relative bg-black aspect-[4/3] overflow-hidden">
-                  <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover"
+                  />
 
                   {/* Scanning reticle */}
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -241,13 +293,24 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
                       <div className="absolute -inset-[200px] bg-black/40" />
 
                       {/* Corner marks — green when confirming */}
-                      {(["top-0 left-0 border-t-2 border-l-2",
-                         "top-0 right-0 border-t-2 border-r-2",
-                         "bottom-0 left-0 border-b-2 border-l-2",
-                         "bottom-0 right-0 border-b-2 border-r-2"] as const).map((cls, i) => (
-                        <div key={i} className={`absolute w-6 h-6 rounded-sm transition-colors duration-150 ${
-                          confirmed ? "border-success" : confirmCountRef.current > 0 ? "border-warning" : "border-primary"
-                        } ${cls}`} />
+                      {(
+                        [
+                          "top-0 left-0 border-t-2 border-l-2",
+                          "top-0 right-0 border-t-2 border-r-2",
+                          "bottom-0 left-0 border-b-2 border-l-2",
+                          "bottom-0 right-0 border-b-2 border-r-2",
+                        ] as const
+                      ).map((cls, i) => (
+                        <div
+                          key={i}
+                          className={`absolute w-6 h-6 rounded-sm transition-colors duration-150 ${
+                            confirmed
+                              ? "border-success"
+                              : confirmCountRef.current > 0
+                                ? "border-warning"
+                                : "border-primary"
+                          } ${cls}`}
+                        />
                       ))}
 
                       {/* Confidence progress bar at bottom of reticle */}
@@ -261,9 +324,14 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
                       )}
 
                       {/* Scan line animation when idle */}
-                      {scanning && !confirmed && confirmCountRef.current === 0 && (
-                        <div className="absolute left-2 right-2 h-0.5 bg-primary/60 animate-bounce" style={{ top: "50%" }} />
-                      )}
+                      {scanning &&
+                        !confirmed &&
+                        confirmCountRef.current === 0 && (
+                          <div
+                            className="absolute left-2 right-2 h-0.5 bg-primary/60 animate-bounce"
+                            style={{ top: "50%" }}
+                          />
+                        )}
                     </div>
                   </div>
 
@@ -272,7 +340,9 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                       <div className="bg-success/90 text-white px-5 py-3 rounded-xl flex items-center gap-2 shadow-lg">
                         <CheckCircle2 className="w-5 h-5 shrink-0" />
-                        <span className="font-mono font-semibold text-sm">{confirmed}</span>
+                        <span className="font-mono font-semibold text-sm">
+                          {confirmed}
+                        </span>
                       </div>
                     </div>
                   )}
@@ -306,14 +376,17 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
                 autoFocus
                 type="text"
                 value={manualCode}
-                onChange={e => setManualCode(e.target.value)}
+                onChange={(e) => setManualCode(e.target.value)}
                 placeholder="Scan or type barcode..."
                 className="flex-1 px-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-                onKeyDown={e => {
+                onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
                     const code = manualCode.trim();
-                    if (code) { onScan(code); setManualCode(""); }
+                    if (code) {
+                      onScan(code);
+                      setManualCode("");
+                    }
                   }
                 }}
               />
@@ -326,7 +399,8 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
               </button>
             </form>
             <p className="text-xs text-muted-foreground/70">
-              💡 USB/Bluetooth scanners work automatically — they type the code and press Enter.
+              💡 USB/Bluetooth scanners work automatically — they type the code
+              and press Enter.
             </p>
           </div>
         )}

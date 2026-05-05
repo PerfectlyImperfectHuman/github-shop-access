@@ -323,7 +323,9 @@ export default function DailyClose() {
                   }}
                 >
                   <span>
-                    {e.category.replace("cat_", "")}
+                    {expenseCategories.find((c) => c.value === e.category)
+                      ?.label ??
+                      e.category.replace(/^cat_/, "").replace(/_/g, " ")}
                     {e.note ? ` (${e.note})` : ""}
                   </span>
                   <span>Rs. {e.amount.toLocaleString()}</span>
@@ -545,7 +547,9 @@ export default function DailyClose() {
                       className="flex items-center gap-3 px-4 py-2.5"
                     >
                       <span className="text-xs px-2 py-0.5 rounded-full bg-warning/10 text-warning font-medium shrink-0">
-                        {t(e.category as any) || e.category}
+                        {expenseCategories.find((c) => c.value === e.category)
+                          ?.label ??
+                          e.category.replace(/^cat_/, "").replace(/_/g, " ")}
                       </span>
                       <p className="text-sm text-card-foreground truncate flex-1">
                         {e.note || "—"}
