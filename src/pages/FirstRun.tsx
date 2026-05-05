@@ -4,8 +4,20 @@
  */
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Store, ShoppingCart, Check, ArrowRight, BookOpen, BarChart3, Scan, MessageCircle, DollarSign, Users } from "lucide-react";
+import {
+  Store,
+  ShoppingCart,
+  Check,
+  ArrowRight,
+  BookOpen,
+  BarChart3,
+  Scan,
+  MessageCircle,
+  DollarSign,
+  Users,
+} from "lucide-react";
 import { db, initSettings } from "@/lib/db";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface FirstRunProps {
   onComplete: () => void;
@@ -24,10 +36,10 @@ const modes = [
     color: "from-emerald-500 to-teal-600",
     borderActive: "border-emerald-500 ring-2 ring-emerald-500/30",
     features: [
-      { icon: BookOpen,      text: "Customer udhar (khata) tracking" },
+      { icon: BookOpen, text: "Customer udhar (khata) tracking" },
       { icon: MessageCircle, text: "WhatsApp balance reminders" },
-      { icon: DollarSign,    text: "Quick payment recording" },
-      { icon: Users,         text: "Daily closing report" },
+      { icon: DollarSign, text: "Quick payment recording" },
+      { icon: Users, text: "Daily closing report" },
     ],
   },
   {
@@ -40,23 +52,25 @@ const modes = [
     color: "from-blue-500 to-indigo-600",
     borderActive: "border-blue-500 ring-2 ring-blue-500/30",
     features: [
-      { icon: Scan,      text: "Barcode scanner & POS" },
-      { icon: Store,     text: "Product inventory tracking" },
+      { icon: Scan, text: "Barcode scanner & POS" },
+      { icon: Store, text: "Product inventory tracking" },
       { icon: BarChart3, text: "Sales & profit reports" },
-      { icon: BookOpen,  text: "Full udhar + khata system" },
+      { icon: BookOpen, text: "Full udhar + khata system" },
     ],
   },
 ];
 
 export default function FirstRun({ onComplete }: FirstRunProps) {
   const [selected, setSelected] = useState<ShopType | null>(null);
-  const [saving, setSaving]     = useState(false);
+  const [saving, setSaving] = useState(false);
+  const { setShopType } = useLanguage();
 
   async function handleContinue() {
     if (!selected) return;
     setSaving(true);
     const s = await initSettings();
     await db.settings.put({ ...s, shopType: selected });
+    setShopType(selected); // update LanguageContext immediately — no reload needed
     onComplete();
   }
 
@@ -72,13 +86,57 @@ export default function FirstRun({ onComplete }: FirstRunProps) {
         >
           {/* Inline logo so no external image needed */}
           <svg viewBox="0 0 100 100" className="w-12 h-12">
-            <path d="M11,31 Q11,27 15,28 L47,34 L47,77 L15,71 Q11,70 11,66 Z" fill="white" opacity="0.95"/>
-            <path d="M89,31 Q89,27 85,28 L53,34 L53,77 L85,71 Q89,70 89,66 Z" fill="white" opacity="0.95"/>
-            <rect x="45" y="32" width="10" height="46" rx="3" fill="rgba(255,255,255,0.2)"/>
-            <rect x="17" y="41" width="24" height="2.5" rx="1.2" fill="rgba(255,255,255,0.45)"/>
-            <rect x="17" y="48" width="24" height="2.5" rx="1.2" fill="rgba(255,255,255,0.45)"/>
-            <rect x="17" y="55" width="16" height="2.5" rx="1.2" fill="rgba(255,255,255,0.45)"/>
-            <path d="M61,53 L68,61 L83,43" stroke="white" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.7"/>
+            <path
+              d="M11,31 Q11,27 15,28 L47,34 L47,77 L15,71 Q11,70 11,66 Z"
+              fill="white"
+              opacity="0.95"
+            />
+            <path
+              d="M89,31 Q89,27 85,28 L53,34 L53,77 L85,71 Q89,70 89,66 Z"
+              fill="white"
+              opacity="0.95"
+            />
+            <rect
+              x="45"
+              y="32"
+              width="10"
+              height="46"
+              rx="3"
+              fill="rgba(255,255,255,0.2)"
+            />
+            <rect
+              x="17"
+              y="41"
+              width="24"
+              height="2.5"
+              rx="1.2"
+              fill="rgba(255,255,255,0.45)"
+            />
+            <rect
+              x="17"
+              y="48"
+              width="24"
+              height="2.5"
+              rx="1.2"
+              fill="rgba(255,255,255,0.45)"
+            />
+            <rect
+              x="17"
+              y="55"
+              width="16"
+              height="2.5"
+              rx="1.2"
+              fill="rgba(255,255,255,0.45)"
+            />
+            <path
+              d="M61,53 L68,61 L83,43"
+              stroke="white"
+              strokeWidth="4.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill="none"
+              opacity="0.7"
+            />
           </svg>
         </motion.div>
         <motion.h1
@@ -102,8 +160,12 @@ export default function FirstRun({ onComplete }: FirstRunProps) {
       {/* Selection area */}
       <div className="flex-1 px-4 py-6 space-y-4 max-w-lg mx-auto w-full">
         <div className="text-center mb-2">
-          <h2 className="text-lg font-display font-bold text-foreground">Apni dukan ka type chunein</h2>
-          <p className="text-sm text-muted-foreground mt-0.5">اپنی دکان کا قسم چنیں — Choose your shop type</p>
+          <h2 className="text-lg font-display font-bold text-foreground">
+            Apni dukan ka type chunein
+          </h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            اپنی دکان کا قسم چنیں — Choose your shop type
+          </p>
         </div>
 
         {modes.map((mode, i) => {
@@ -116,35 +178,56 @@ export default function FirstRun({ onComplete }: FirstRunProps) {
               transition={{ delay: 0.25 + i * 0.1 }}
               onClick={() => setSelected(mode.type)}
               className={`w-full text-left rounded-2xl border-2 p-4 transition-all duration-200 bg-card shadow-sm ${
-                isSelected ? mode.borderActive : "border-border hover:border-muted-foreground/30"
+                isSelected
+                  ? mode.borderActive
+                  : "border-border hover:border-muted-foreground/30"
               }`}
             >
               <div className="flex items-start gap-3">
-                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${mode.color} flex items-center justify-center text-2xl shrink-0`}>
+                <div
+                  className={`w-12 h-12 rounded-xl bg-gradient-to-br ${mode.color} flex items-center justify-center text-2xl shrink-0`}
+                >
                   {mode.emoji}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <div>
-                      <p className="font-display font-bold text-card-foreground text-base leading-tight">{mode.title}</p>
-                      <p className="text-xs text-muted-foreground" style={{ fontFamily: "serif" }}>{mode.urdu}</p>
+                      <p className="font-display font-bold text-card-foreground text-base leading-tight">
+                        {mode.title}
+                      </p>
+                      <p
+                        className="text-xs text-muted-foreground"
+                        style={{ fontFamily: "serif" }}
+                      >
+                        {mode.urdu}
+                      </p>
                     </div>
-                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
-                      isSelected ? "bg-primary border-primary" : "border-border"
-                    }`}>
-                      {isSelected && <Check className="w-3.5 h-3.5 text-white" />}
+                    <div
+                      className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
+                        isSelected
+                          ? "bg-primary border-primary"
+                          : "border-border"
+                      }`}
+                    >
+                      {isSelected && (
+                        <Check className="w-3.5 h-3.5 text-white" />
+                      )}
                     </div>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1.5">{mode.subtitle}</p>
+                  <p className="text-xs text-muted-foreground mt-1.5">
+                    {mode.subtitle}
+                  </p>
                 </div>
               </div>
 
               {/* Features */}
               <div className="mt-3 grid grid-cols-2 gap-1.5">
-                {mode.features.map(f => (
+                {mode.features.map((f) => (
                   <div key={f.text} className="flex items-center gap-1.5">
                     <f.icon className="w-3 h-3 text-primary shrink-0" />
-                    <span className="text-[11px] text-muted-foreground leading-tight">{f.text}</span>
+                    <span className="text-[11px] text-muted-foreground leading-tight">
+                      {f.text}
+                    </span>
                   </div>
                 ))}
               </div>

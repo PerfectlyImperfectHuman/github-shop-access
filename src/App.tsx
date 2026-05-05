@@ -78,9 +78,11 @@ export default function App() {
   }, []);
 
   const handleFirstRunComplete = () => {
-    // Reload so LanguageContext re-reads shopType from DB on fresh mount.
-    // (LanguageContext reads settings once on mount and won't re-read otherwise.)
-    window.location.reload();
+    initSettings().then((s) => {
+      setSettings(s);
+      if (s.pinEnabled && /^\d{4}$/.test(s.pinCode)) setPhase("pin");
+      else setPhase("main");
+    });
   };
 
   const handlePinSuccess = () => setPhase("main");

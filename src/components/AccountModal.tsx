@@ -20,7 +20,7 @@ import {
   hasLocalAccount,
   formatPakistaniPhone,
 } from "@/lib/authService";
-import { getCloudBackupInfo } from "@/lib/cloudBackup";
+import { getCloudBackupInfo, restoreFromCloud } from "@/lib/cloudBackup";
 import { initialPushToFirestore } from "@/lib/syncService";
 import { toast } from "sonner";
 import type { User } from "firebase/auth";
@@ -172,8 +172,13 @@ export function AccountModal({ onSuccess, onClose }: AccountModalProps) {
     try {
       const user = await signInWithPhonePin(phone, pin);
       const info = await getCloudBackupInfo();
-      // No existing cloud backup → push local Dexie data up (first login on this account)
-      if (!info) await initialPushToFirestore().catch(() => {});
+      if (!info) {
+        // No cloud backup yet — push this device's local data up
+        await initialPushToFirestore().catch(() => {});
+      } else {
+        // Cloud backup exists — pull it down so this device is in sync
+        await restoreFromCloud().catch(() => {});
+      }
       setSignedInUser(user);
       setStep("success");
       setTimeout(() => onSuccess(user, info), 900);
@@ -237,8 +242,11 @@ export function AccountModal({ onSuccess, onClose }: AccountModalProps) {
       return;
     }
     const info = await getCloudBackupInfo();
-    // New device recovery with no prior backup → push any local data up
-    if (!info) await initialPushToFirestore().catch(() => {});
+    if (!info) {
+      await initialPushToFirestore().catch(() => {});
+    } else {
+      await restoreFromCloud().catch(() => {});
+    }
     setStep("success");
     setTimeout(() => onSuccess(signedInUser!, info), 900);
   }
@@ -498,10 +506,8 @@ export function AccountModal({ onSuccess, onClose }: AccountModalProps) {
               </button>
               <button
                 onClick={() => {
-                  setNewPinForReset("");
-                  setConfirmNewPinForReset("");
-                  setRecoveryInput("");
-                  setStep("recovery-entry");
+                  setPin("");
+                  setStep("pin-signin");
                 }}
                 className="w-full flex items-center gap-4 px-4 py-3.5 bg-muted/40 border-2 border-border hover:border-muted-foreground/30 rounded-xl transition text-left"
               >
