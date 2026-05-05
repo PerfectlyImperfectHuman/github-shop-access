@@ -21,7 +21,6 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { useLanguage } from "@/contexts/LanguageContext";
 import type { Product } from "@/types";
-import { LowStockBanner } from "@/components/LowStockBanner";
 
 const CATEGORIES = [
   "General",
@@ -179,8 +178,6 @@ export default function Products() {
 
   return (
     <div className="space-y-5 animate-fade-in">
-      <LowStockBanner />
-
       {/* Barcode Scanner Modal */}
 
       {showScanner && (

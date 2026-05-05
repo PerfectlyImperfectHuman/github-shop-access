@@ -132,7 +132,15 @@ export default function SettingsPage() {
     }
     setSaving(true);
     const prev = await db.settings.get("default");
-    await db.settings.put(settings);
+    // FIX Bug 2: shopType, lang, printerWidth are managed by LanguageContext and
+    // updated directly to DB via their setters — they never update local `settings`
+    // state. Spreading them here ensures Save never overwrites them with stale values.
+    await db.settings.put({
+      ...settings,
+      shopType,
+      language: lang,
+      printerWidth,
+    });
     if (
       prev &&
       (prev.pinCode !== settings.pinCode ||

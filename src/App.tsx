@@ -26,6 +26,12 @@ import {
   requestNotificationPermission,
   checkAndNotifyLowStock,
 } from "./lib/notifications";
+import {
+  startFirestoreListeners,
+  stopFirestoreListeners,
+} from "./lib/firestoreListeners";
+import { flushSyncQueue, setupOnlineListener } from "./lib/syncService";
+import { onAuthChange } from "./lib/authService";
 
 type BootPhase = "splash" | "first_run" | "pin" | "main";
 
@@ -33,6 +39,7 @@ export default function App() {
   const [phase, setPhase] = useState<BootPhase>("splash");
   const [settings, setSettings] = useState<Settings | null>(null);
 
+  // Boot: load settings and determine which screen to show
   useEffect(() => {
     setupAutoBackup();
     initSettings().then((s) => {
@@ -47,16 +54,33 @@ export default function App() {
     });
   }, []);
 
-  requestNotificationPermission().then((granted) => {
-    if (granted) setTimeout(checkAndNotifyLowStock, 3000);
-  });
+  // FIX Bug 4: was in component body (ran on every render) — now runs once only
+  useEffect(() => {
+    requestNotificationPermission().then((granted) => {
+      if (granted) setTimeout(checkAndNotifyLowStock, 3000);
+    });
+  }, []);
+
+  // FIX Bug 6: wire up online-queue flush + Firestore real-time listeners
+  useEffect(() => {
+    setupOnlineListener(); // flushes syncQueue when device comes back online
+
+    const unsubAuth = onAuthChange((user) => {
+      if (user) {
+        startFirestoreListeners(); // start pulling changes from other devices
+        flushSyncQueue().catch(() => {}); // push any queued offline writes
+      } else {
+        stopFirestoreListeners(); // clean up when logged out
+      }
+    });
+
+    return () => unsubAuth();
+  }, []);
 
   const handleFirstRunComplete = () => {
-    initSettings().then((s) => {
-      setSettings(s);
-      if (s.pinEnabled && /^\d{4}$/.test(s.pinCode)) setPhase("pin");
-      else setPhase("main");
-    });
+    // Reload so LanguageContext re-reads shopType from DB on fresh mount.
+    // (LanguageContext reads settings once on mount and won't re-read otherwise.)
+    window.location.reload();
   };
 
   const handlePinSuccess = () => setPhase("main");
