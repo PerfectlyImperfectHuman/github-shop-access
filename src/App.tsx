@@ -16,12 +16,14 @@ import FirstRun from "./pages/FirstRun";
 import Suppliers from "./pages/Suppliers";
 import SupplierLedger from "./pages/SupplierLedger";
 import PinLock from "./pages/PinLock";
+import Cheques from "./pages/Cheques";
 import { initSettings } from "./lib/db";
 import { LanguageProvider } from "./contexts/LanguageContext";
+import { ModeProvider } from "./contexts/ModeContext";
+import { ModeGuard } from "./components/ModeGuard";
 import type { Settings } from "./types";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { setupAutoBackup } from "./lib/cloudBackup";
-import Cheques from "./pages/Cheques";
 import {
   requestNotificationPermission,
   checkAndNotifyLowStock,
@@ -54,23 +56,21 @@ export default function App() {
     });
   }, []);
 
-  // FIX Bug 4: was in component body (ran on every render) — now runs once only
   useEffect(() => {
     requestNotificationPermission().then((granted) => {
       if (granted) setTimeout(checkAndNotifyLowStock, 3000);
     });
   }, []);
 
-  // FIX Bug 6: wire up online-queue flush + Firestore real-time listeners
   useEffect(() => {
-    setupOnlineListener(); // flushes syncQueue when device comes back online
+    setupOnlineListener();
 
     const unsubAuth = onAuthChange((user) => {
       if (user) {
-        startFirestoreListeners(); // start pulling changes from other devices
-        flushSyncQueue().catch(() => {}); // push any queued offline writes
+        startFirestoreListeners();
+        flushSyncQueue().catch(() => {});
       } else {
-        stopFirestoreListeners(); // clean up when logged out
+        stopFirestoreListeners();
       }
     });
 
@@ -129,38 +129,101 @@ export default function App() {
   return (
     <ErrorBoundary>
       <LanguageProvider>
-        <Toaster position="top-center" richColors />
-        {phase === "first_run" ? (
-          <BrowserRouter>
-            <FirstRun onComplete={handleFirstRunComplete} />
-          </BrowserRouter>
-        ) : phase === "pin" && settings && /^\d{4}$/.test(settings.pinCode) ? (
-          <PinLock
-            expectedPin={settings.pinCode}
-            onSuccess={handlePinSuccess}
-          />
-        ) : (
-          <BrowserRouter>
-            <Routes>
-              <Route element={<Layout />}>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/customers" element={<Customers />} />
-                <Route path="/customers/:id" element={<CustomerLedger />} />
-                <Route path="/suppliers" element={<Suppliers />} />
-                <Route path="/suppliers/:id" element={<SupplierLedger />} />
-                <Route path="/transactions" element={<TransactionHistory />} />
-                <Route path="/cheques" element={<Cheques />} />
-                <Route path="/reports" element={<Reports />} />
-                <Route path="/settings" element={<SettingsPage />} />
-                <Route path="/new-transaction" element={<NewTransaction />} />
-                <Route path="/products" element={<Products />} />
-                <Route path="/sale" element={<SaleReceipt />} />
-                <Route path="/daily-close" element={<DailyClose />} />
-              </Route>
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </BrowserRouter>
-        )}
+        {/*
+         * ModeProvider wraps everything below LanguageProvider.
+         * It reads from the same DB as LanguageProvider so order doesn't matter,
+         * but placing it inside LanguageProvider means both contexts are available
+         * to any shared consumers (e.g. Layout).
+         */}
+        <ModeProvider>
+          <Toaster position="top-center" richColors />
+          {phase === "first_run" ? (
+            <BrowserRouter>
+              <FirstRun onComplete={handleFirstRunComplete} />
+            </BrowserRouter>
+          ) : phase === "pin" && settings && /^\d{4}$/.test(settings.pinCode) ? (
+            <PinLock
+              expectedPin={settings.pinCode}
+              onSuccess={handlePinSuccess}
+            />
+          ) : (
+            <BrowserRouter>
+              <Routes>
+                <Route element={<Layout />}>
+                  {/* ── Always accessible ─────────────────────────────────── */}
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/customers" element={<Customers />} />
+                  <Route path="/customers/:id" element={<CustomerLedger />} />
+                  <Route path="/new-transaction" element={<NewTransaction />} />
+                  <Route path="/products" element={<Products />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+
+                  {/* ── Pro mode and above ────────────────────────────────── */}
+                  <Route
+                    path="/suppliers"
+                    element={
+                      <ModeGuard>
+                        <Suppliers />
+                      </ModeGuard>
+                    }
+                  />
+                  <Route
+                    path="/suppliers/:id"
+                    element={
+                      <ModeGuard>
+                        <SupplierLedger />
+                      </ModeGuard>
+                    }
+                  />
+                  <Route
+                    path="/sale"
+                    element={
+                      <ModeGuard>
+                        <SaleReceipt />
+                      </ModeGuard>
+                    }
+                  />
+                  <Route
+                    path="/transactions"
+                    element={
+                      <ModeGuard>
+                        <TransactionHistory />
+                      </ModeGuard>
+                    }
+                  />
+                  <Route
+                    path="/daily-close"
+                    element={
+                      <ModeGuard>
+                        <DailyClose />
+                      </ModeGuard>
+                    }
+                  />
+
+                  {/* ── Advanced mode only ────────────────────────────────── */}
+                  <Route
+                    path="/reports"
+                    element={
+                      <ModeGuard>
+                        <Reports />
+                      </ModeGuard>
+                    }
+                  />
+                  <Route
+                    path="/cheques"
+                    element={
+                      <ModeGuard>
+                        <Cheques />
+                      </ModeGuard>
+                    }
+                  />
+                </Route>
+
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </BrowserRouter>
+          )}
+        </ModeProvider>
       </LanguageProvider>
     </ErrorBoundary>
   );

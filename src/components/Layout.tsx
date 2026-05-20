@@ -1,82 +1,23 @@
+/**
+ * Layout.tsx
+ *
+ * Changes from v1:
+ * - Removed hardcoded karyanaNav / proNav / karyanaBottomNav / proBottomNav arrays.
+ * - Nav items are now derived from modeConfig via getSidebarFeatures() and
+ *   getBottomNavFeatures(). Adding features to the app = zero Layout changes.
+ * - Reads mode from ModeContext (same store as LanguageContext).
+ * - App subtitle reflects mode label, not just binary shopType.
+ */
+
 import { Outlet, NavLink, useLocation } from "react-router-dom";
-import {
-  LayoutDashboard,
-  Users,
-  PlusCircle,
-  History,
-  BarChart3,
-  Settings,
-  Menu,
-  X,
-  Package,
-  Moon,
-  Sun,
-  ShoppingCart,
-  ClipboardCheck,
-  Truck,
-  Banknote,
-} from "lucide-react";
+import { Menu, X, Moon, Sun } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { db, initSettings } from "@/lib/db";
 import { useLanguage } from "@/contexts/LanguageContext";
-import type { StringKey } from "@/lib/i18n";
-
-interface NavItem {
-  to: string;
-  icon: any;
-  labelKey: StringKey;
-  primary?: boolean;
-}
-
-const karyanaNav: NavItem[] = [
-  { to: "/", icon: LayoutDashboard, labelKey: "nav_home" },
-  { to: "/customers", icon: Users, labelKey: "nav_customers" },
-  { to: "/suppliers", icon: Truck, labelKey: "nav_suppliers" },
-  { to: "/cheques", icon: Banknote, labelKey: "nav_cheques" },
-  { to: "/new-transaction", icon: PlusCircle, labelKey: "nav_udhar_wapsi" },
-  { to: "/daily-close", icon: ClipboardCheck, labelKey: "nav_daily_close" },
-  { to: "/settings", icon: Settings, labelKey: "nav_settings" },
-];
-const karyanaBottomNav: NavItem[] = [
-  { to: "/", icon: LayoutDashboard, labelKey: "nav_home" },
-  { to: "/customers", icon: Users, labelKey: "nav_customers" },
-  {
-    to: "/new-transaction",
-    icon: PlusCircle,
-    labelKey: "nav_udhar",
-    primary: true,
-  },
-  { to: "/daily-close", icon: ClipboardCheck, labelKey: "nav_close" },
-  { to: "/settings", icon: Settings, labelKey: "nav_settings" },
-];
-
-const proNav: NavItem[] = [
-  { to: "/", icon: LayoutDashboard, labelKey: "nav_dashboard" },
-  { to: "/customers", icon: Users, labelKey: "nav_customers" },
-  { to: "/suppliers", icon: Truck, labelKey: "nav_suppliers" },
-  { to: "/cheques", icon: Banknote, labelKey: "nav_cheques" },
-  { to: "/products", icon: Package, labelKey: "nav_products" },
-  { to: "/new-transaction", icon: PlusCircle, labelKey: "nav_new_entry" },
-  { to: "/sale", icon: ShoppingCart, labelKey: "nav_pos" },
-  { to: "/transactions", icon: History, labelKey: "nav_history" },
-  { to: "/reports", icon: BarChart3, labelKey: "nav_reports" },
-  { to: "/daily-close", icon: ClipboardCheck, labelKey: "nav_daily_close" },
-  { to: "/settings", icon: Settings, labelKey: "nav_settings" },
-];
-const proBottomNav: NavItem[] = [
-  { to: "/", icon: LayoutDashboard, labelKey: "nav_home" },
-  { to: "/customers", icon: Users, labelKey: "nav_customers" },
-  {
-    to: "/new-transaction",
-    icon: PlusCircle,
-    labelKey: "nav_entry",
-    primary: true,
-  },
-  { to: "/sale", icon: ShoppingCart, labelKey: "nav_pos" },
-  { to: "/daily-close", icon: ClipboardCheck, labelKey: "nav_close" },
-];
+import { useMode } from "@/contexts/ModeContext";
+import { getSidebarFeatures, getBottomNavFeatures, MODE_INFO } from "@/lib/modeConfig";
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -84,8 +25,14 @@ export default function Layout() {
   const [online, setOnline] = useState(() =>
     typeof navigator !== "undefined" ? navigator.onLine : true,
   );
-  const { t, shopType, isUrdu } = useLanguage();
+
+  const { t, isUrdu } = useLanguage();
+  const { mode } = useMode();
   const location = useLocation();
+
+  // Derive nav items from the centralized config — no hardcoding
+  const navItems = getSidebarFeatures(mode);
+  const bottomNavItems = getBottomNavFeatures(mode);
 
   useEffect(() => {
     initSettings().then((s) => {
@@ -115,13 +62,8 @@ export default function Layout() {
     await db.settings.update("default", { darkMode: next });
   };
 
-  const navItems = shopType === "kiryana" ? karyanaNav : proNav;
-  const bottomNavItems =
-    shopType === "kiryana" ? karyanaBottomNav : proBottomNav;
-
   const appName = t("app_name");
-  const appSub =
-    shopType === "kiryana" ? t("app_tagline_kiryana") : t("app_tagline_pro");
+  const appSub = MODE_INFO[mode].tagline;
 
   const currentPage = navItems.find((n) => {
     if (n.to === "/") return location.pathname === "/";
@@ -208,7 +150,7 @@ export default function Layout() {
           <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
             {navItems.map((item) => (
               <NavLink
-                key={item.to}
+                key={item.key}
                 to={item.to}
                 end={item.to === "/"}
                 className={({ isActive }) =>
@@ -279,7 +221,7 @@ export default function Layout() {
                 <nav className="px-3 py-4 space-y-0.5 flex-1 overflow-y-auto">
                   {navItems.map((item) => (
                     <NavLink
-                      key={item.to}
+                      key={item.key}
                       to={item.to}
                       end={item.to === "/"}
                       onClick={() => setSidebarOpen(false)}
@@ -339,13 +281,13 @@ export default function Layout() {
             <div className="flex items-center justify-around px-1 py-1.5">
               {bottomNavItems.map((item) => (
                 <NavLink
-                  key={item.to}
+                  key={item.key}
                   to={item.to}
                   end={item.to === "/"}
                   className={({ isActive }) =>
                     cn(
                       "flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl text-[10px] font-medium transition-all",
-                      item.primary
+                      item.primaryAction
                         ? "text-primary-foreground bg-primary px-4 rounded-2xl shadow-sm shadow-primary/40"
                         : isActive
                           ? "text-primary"

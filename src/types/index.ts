@@ -81,7 +81,14 @@ export interface Settings {
   language: "en" | "ur";
   taxRate: number;
   receiptFooter: string;
-  shopType: "kiryana" | "pro" | "";
+  /**
+   * Persisted mode value.
+   * "kiryana" is kept in the union for IndexedDB backward compatibility —
+   * existing rows written by v1 will have "kiryana" stored. At runtime,
+   * normaliseMode() in modeConfig.ts converts it to "simple" before use.
+   * New writes always use "simple" | "pro" | "advanced".
+   */
+  shopType: "simple" | "pro" | "advanced" | "kiryana" | "";
   printerWidth: "58mm" | "80mm";
   pinEnabled: boolean;
   pinCode: string;

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Save,
   Download,
@@ -19,6 +19,7 @@ import {
   CloudOff,
   LogOut,
   RefreshCw,
+  ChevronRight,
 } from "lucide-react";
 import { initSettings, exportData, importData, db } from "@/lib/db";
 import { PinNumpad, PinDots } from "@/pages/PinLock";
@@ -27,6 +28,13 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { AccountModal } from "@/components/AccountModal";
 import { toast } from "sonner";
 import { useT, useLanguage } from "@/contexts/LanguageContext";
+import { useMode } from "@/contexts/ModeContext";
+import {
+  ALL_FEATURES,
+  MODE_INFO,
+  modeIncludes,
+  type AppMode,
+} from "@/lib/modeConfig";
 import {
   signOutAccount,
   onAuthChange,
@@ -48,16 +56,162 @@ function emailToDisplayPhone(email: string | null | undefined): string {
   return formatPakistaniPhone(digits);
 }
 
+// ─── Mode selector card ───────────────────────────────────────────────────────
+
+interface ModeSelectorCardProps {
+  info: (typeof MODE_INFO)[AppMode];
+  isActive: boolean;
+  onSelect: () => void;
+}
+
+function ModeSelectorCard({ info, isActive, onSelect }: ModeSelectorCardProps) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        "w-full text-left rounded-xl border-2 p-4 transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        isActive
+          ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+          : "border-border bg-card hover:border-muted-foreground/30",
+      )}
+    >
+      <div className="flex items-start gap-3">
+        {/* Radio dot */}
+        <div
+          className={cn(
+            "mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors",
+            isActive ? "bg-primary border-primary" : "border-border",
+          )}
+        >
+          {isActive && <Check className="w-3 h-3 text-primary-foreground" />}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          {/* Mode name + badge */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold text-sm text-card-foreground">
+              {info.label}
+            </span>
+            <span
+              className={cn(
+                "text-[10px] font-semibold px-2 py-0.5 rounded-full border",
+                info.colorClasses,
+              )}
+            >
+              {info.tagline}
+            </span>
+          </div>
+
+          {/* Target audience */}
+          <p className="text-xs text-muted-foreground mt-1">{info.audience}</p>
+
+          {/* Feature list */}
+          <ul className="mt-2.5 space-y-1">
+            {info.features.map((feat) => (
+              <li
+                key={feat}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground"
+              >
+                <svg
+                  className="w-3 h-3 text-primary shrink-0"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                {feat}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+// ─── Reusable binary choice card (language, printer) ─────────────────────────
+
+function ChoiceCard<T extends string>({
+  value,
+  current,
+  onClick,
+  title,
+  desc,
+}: {
+  value: T;
+  current: T;
+  onClick: () => void;
+  title: string;
+  desc: string;
+}) {
+  const active = current === value;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex items-start gap-3 w-full p-4 rounded-xl border-2 text-left transition-all",
+        active
+          ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+          : "border-border hover:border-muted-foreground/30 bg-card",
+      )}
+    >
+      <div
+        className={cn(
+          "w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition-colors",
+          active ? "bg-primary border-primary" : "border-border",
+        )}
+      >
+        {active && <Check className="w-3 h-3 text-primary-foreground" />}
+      </div>
+      <div>
+        <p className="font-semibold text-card-foreground text-sm">{title}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
+      </div>
+    </button>
+  );
+}
+
+// ─── Section header ───────────────────────────────────────────────────────────
+
+function SectionHeader({
+  icon: Icon,
+  title,
+  subtitle,
+}: {
+  icon: React.ElementType;
+  title: string;
+  subtitle?: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 mb-4">
+      <div className="p-2 rounded-lg bg-primary/10 shrink-0">
+        <Icon className="w-4 h-4 text-primary" />
+      </div>
+      <div>
+        <h3 className="font-display font-semibold text-card-foreground leading-tight">
+          {title}
+        </h3>
+        {subtitle && (
+          <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
+
 export default function SettingsPage() {
   const t = useT();
-  const {
-    lang,
-    setLang,
-    shopType,
-    setShopType,
-    printerWidth,
-    setPrinterWidth,
-  } = useLanguage();
+  const { lang, setLang, printerWidth, setPrinterWidth } = useLanguage();
+  const { mode, setMode } = useMode();
+
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -81,7 +235,6 @@ export default function SettingsPage() {
     });
   }, []);
 
-  // Listen for auth state changes and load backup info
   useEffect(() => {
     const unsub = onAuthChange(async (user) => {
       setCloudUser(user);
@@ -131,23 +284,19 @@ export default function SettingsPage() {
       return;
     }
     setSaving(true);
-    const prev = await db.settings.get("default");
-    // FIX Bug 2: shopType, lang, printerWidth are managed by LanguageContext and
-    // updated directly to DB via their setters — they never update local `settings`
-    // state. Spreading them here ensures Save never overwrites them with stale values.
-    await db.settings.put({
-      ...settings,
-      shopType,
-      language: lang,
-      printerWidth,
-    });
-    if (
-      prev &&
-      (prev.pinCode !== settings.pinCode ||
-        prev.pinEnabled !== settings.pinEnabled)
-    )
+    try {
+      // Write mode (shopType), lang, printerWidth explicitly to avoid stale
+      // local `settings` state overwriting context-managed values (Bug 2 fix).
+      await db.settings.put({
+        ...settings,
+        shopType: mode,
+        language: lang,
+        printerWidth,
+      });
+      toast.success(t("settings_saved"));
+    } finally {
       setSaving(false);
-    toast.success(t("settings_saved"));
+    }
   }
 
   async function handleExport() {
@@ -276,58 +425,22 @@ export default function SettingsPage() {
     );
   }
 
-  // ── Reusable two-option choice card ──
-  const ChoiceCard = <T extends string>({
-    value,
-    current,
-    onClick,
-    title,
-    desc,
-  }: {
-    value: T;
-    current: T;
-    onClick: () => void;
-    title: string;
-    desc: string;
-  }) => {
-    const active = current === value;
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        className={`flex items-start gap-3 w-full p-4 rounded-xl border-2 text-left transition-all ${
-          active
-            ? "border-primary bg-primary/5 ring-2 ring-primary/20"
-            : "border-border hover:border-muted-foreground/30 bg-card"
-        }`}
-      >
-        <div
-          className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${
-            active ? "bg-primary border-primary" : "border-border"
-          }`}
-        >
-          {active && <Check className="w-3 h-3 text-primary-foreground" />}
-        </div>
-        <div>
-          <p className="font-semibold text-card-foreground text-sm">{title}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
-        </div>
-      </button>
-    );
-  };
+  // Features that become visible when switching to a higher mode
+  // (used for the "you'll unlock" hint in the selector)
+  function getUpgradeFeatures(targetMode: AppMode): string[] {
+    return ALL_FEATURES.filter(
+      (f) =>
+        f.minMode === targetMode &&
+        !modeIncludes(mode, f.minMode),
+    ).map((f) => f.labelKey as string);
+  }
 
   return (
     <div className="max-w-2xl mx-auto space-y-5 animate-fade-in">
-      {/* Language */}
+
+      {/* ── Language ── */}
       <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <Languages className="w-4 h-4 text-primary" />
-          </div>
-          <h3 className="font-display font-semibold text-card-foreground">
-            {t("language")}
-          </h3>
-        </div>
+        <SectionHeader icon={Languages} title={t("language")} />
         <div className="grid grid-cols-2 gap-3">
           <ChoiceCard
             value="en"
@@ -346,44 +459,52 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Shop Mode */}
+      {/* ── App Mode ── */}
       <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <Store className="w-4 h-4 text-primary" />
-          </div>
-          <h3 className="font-display font-semibold text-card-foreground">
-            {t("shop_mode")}
-          </h3>
+        <SectionHeader
+          icon={Store}
+          title={t("shop_mode")}
+          subtitle="Apne kaam ke hisaab se features chunein. Kabhi bhi badal saktay hain."
+        />
+
+        <div className="space-y-3">
+          {(["simple", "pro", "advanced"] as AppMode[]).map((m) => (
+            <ModeSelectorCard
+              key={m}
+              info={MODE_INFO[m]}
+              isActive={mode === m}
+              onSelect={() => {
+                setMode(m);
+                toast.success(`${MODE_INFO[m].label} mode active`);
+              }}
+            />
+          ))}
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <ChoiceCard
-            value="kiryana"
-            current={shopType}
-            onClick={() => setShopType("kiryana")}
-            title={t("shop_mode_kiryana")}
-            desc={t("shop_mode_kiryana_desc")}
-          />
-          <ChoiceCard
-            value="pro"
-            current={shopType}
-            onClick={() => setShopType("pro")}
-            title={t("shop_mode_pro")}
-            desc={t("shop_mode_pro_desc")}
-          />
-        </div>
+
+        {/* Contextual hint — only shown when a non-simple mode is active */}
+        <AnimatePresence>
+          {mode !== "simple" && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="mt-3 flex items-start gap-2 p-3 bg-primary/5 border border-primary/15 rounded-lg">
+                <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                <p className="text-xs text-muted-foreground">
+                  Simple mode mein switch karne se extra features sidebar se
+                  hata diye jayenge. Data safe rahega.
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      {/* Printer Width */}
+      {/* ── Printer Width ── */}
       <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <Printer className="w-4 h-4 text-primary" />
-          </div>
-          <h3 className="font-display font-semibold text-card-foreground">
-            {t("printer_width")}
-          </h3>
-        </div>
+        <SectionHeader icon={Printer} title={t("printer_width")} />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <ChoiceCard
             value="58mm"
@@ -402,21 +523,14 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Shop Details */}
+      {/* ── Shop Details ── */}
       <motion.form
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         onSubmit={handleSave}
         className="bg-card rounded-xl border border-border p-5 shadow-sm"
       >
-        <div className="flex items-center gap-3 mb-5">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <Store className="w-4 h-4 text-primary" />
-          </div>
-          <h3 className="font-display font-semibold text-card-foreground">
-            {t("shop_details")}
-          </h3>
-        </div>
+        <SectionHeader icon={Store} title={t("shop_details")} />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {[
             {
@@ -505,27 +619,23 @@ export default function SettingsPage() {
           disabled={saving}
           className="mt-4 flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition disabled:opacity-60"
         >
-          <Save className="w-4 h-4" />{" "}
+          <Save className="w-4 h-4" />
           {saving ? t("loading") : t("save_settings")}
         </button>
       </motion.form>
 
-      {/* Appearance */}
+      {/* ── Appearance ── */}
       <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <Palette className="w-4 h-4 text-primary" />
-          </div>
-          <h3 className="font-display font-semibold text-card-foreground">
-            {t("appearance")}
-          </h3>
-        </div>
+        <SectionHeader icon={Palette} title={t("appearance")} />
         <button
           onClick={toggleDarkMode}
           className="flex items-center gap-4 w-full px-4 py-3.5 rounded-xl border border-border hover:bg-muted/50 transition text-left"
         >
           <div
-            className={`p-2 rounded-lg ${settings.darkMode ? "bg-primary/10" : "bg-warning/10"}`}
+            className={cn(
+              "p-2 rounded-lg",
+              settings.darkMode ? "bg-primary/10" : "bg-warning/10",
+            )}
           >
             {settings.darkMode ? (
               <Moon className="w-4 h-4 text-primary" />
@@ -544,20 +654,14 @@ export default function SettingsPage() {
         </button>
       </div>
 
-      {/* App PIN lock */}
+      {/* ── App PIN lock ── */}
       <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <Lock className="w-4 h-4 text-primary" />
-          </div>
-          <h3 className="font-display font-semibold text-card-foreground">
-            {t("pin_section_title")}
-          </h3>
-        </div>
-        <p className="text-xs text-muted-foreground mb-4 ml-11">
-          {t("pin_section_desc")}
-        </p>
-        <div className="ml-0 sm:ml-11 space-y-4">
+        <SectionHeader
+          icon={Lock}
+          title={t("pin_section_title")}
+          subtitle={t("pin_section_desc")}
+        />
+        <div className="space-y-4">
           <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-muted/20 px-4 py-3">
             <div className="min-w-0">
               <p className="text-sm font-medium text-card-foreground">
@@ -589,7 +693,7 @@ export default function SettingsPage() {
             >
               <span
                 className={cn(
-                  "absolute top-1 h-6 w-6 rounded-full bg-card shadow transition-transform",
+                  "absolute top-1 h-6 w-6 rounded-full bg-card shadow transition-all duration-200",
                   settings.pinEnabled ? "left-7" : "left-1",
                 )}
               />
@@ -615,26 +719,14 @@ export default function SettingsPage() {
 
       {/* ── Cloud Backup ── */}
       <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 rounded-lg bg-primary/10">
-            {cloudUser ? (
-              <Cloud className="w-4 h-4 text-primary" />
-            ) : (
-              <CloudOff className="w-4 h-4 text-primary" />
-            )}
-          </div>
-          <div>
-            <h3 className="font-display font-semibold text-card-foreground">
-              Cloud Backup
-            </h3>
-            <p className="text-xs text-muted-foreground">
-              Phone kho jaye toh bhi data safe rahe
-            </p>
-          </div>
-        </div>
+        <SectionHeader
+          icon={cloudUser ? Cloud : CloudOff}
+          title="Cloud Backup"
+          subtitle="Phone kho jaye toh bhi data safe rahe"
+        />
 
         {!cloudUser ? (
-          <div className="mt-4 space-y-3">
+          <div className="space-y-3">
             <div className="p-3 bg-warning/10 rounded-lg flex items-start gap-2">
               <Info className="w-4 h-4 text-warning shrink-0 mt-0.5" />
               <p className="text-xs text-warning font-medium">
@@ -668,17 +760,7 @@ export default function SettingsPage() {
                   PIN se secure — free, fast, koi SMS nahi
                 </p>
               </div>
-              <svg
-                className="w-4 h-4 text-muted-foreground group-hover:text-primary transition shrink-0"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M9 18l6-6-6-6" />
-              </svg>
+              <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition shrink-0" />
             </button>
 
             <div className="flex items-center justify-center gap-4 pt-1">
@@ -704,7 +786,7 @@ export default function SettingsPage() {
             </div>
           </div>
         ) : (
-          <div className="mt-4 space-y-3">
+          <div className="space-y-3">
             <div className="flex items-center gap-3 p-3.5 bg-success/8 border border-success/20 rounded-xl">
               <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center shrink-0">
                 <svg
@@ -785,17 +867,11 @@ export default function SettingsPage() {
 
       {/* ── Local Backup ── */}
       <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <Database className="w-4 h-4 text-primary" />
-          </div>
-          <h3 className="font-display font-semibold text-card-foreground">
-            {t("data_backup")}
-          </h3>
-        </div>
-        <p className="text-xs text-muted-foreground mb-4 ml-11">
-          {t("data_backup_desc")}
-        </p>
+        <SectionHeader
+          icon={Database}
+          title={t("data_backup")}
+          subtitle={t("data_backup_desc")}
+        />
         <div className="flex flex-col sm:flex-row gap-3">
           <button
             onClick={handleExport}
@@ -816,10 +892,10 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Danger Zone */}
+      {/* ── Danger Zone ── */}
       <div className="bg-card rounded-xl border border-destructive/30 p-5 shadow-sm">
         <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 rounded-lg bg-destructive/10">
+          <div className="p-2 rounded-lg bg-destructive/10 shrink-0">
             <Shield className="w-4 h-4 text-destructive" />
           </div>
           <h3 className="font-display font-semibold text-destructive">
@@ -838,6 +914,7 @@ export default function SettingsPage() {
         </button>
       </div>
 
+      {/* ── Modals ── */}
       {showPhoneModal && (
         <AccountModal
           onSuccess={handlePhoneAuthSuccess}

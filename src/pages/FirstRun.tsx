@@ -1,12 +1,6 @@
-/**
- * FirstRun — shown once when the app is first installed.
- * User picks their shop type, which configures navigation and features.
- */
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Store,
-  ShoppingCart,
   Check,
   ArrowRight,
   BookOpen,
@@ -15,53 +9,74 @@ import {
   MessageCircle,
   DollarSign,
   Users,
+  Truck,
+  ClipboardCheck,
+  Banknote,
+  ShoppingCart,
 } from "lucide-react";
 import { db, initSettings } from "@/lib/db";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage, type ShopMode } from "@/contexts/LanguageContext";
 
 interface FirstRunProps {
   onComplete: () => void;
 }
 
-type ShopType = "kiryana" | "pro";
-
 const modes = [
   {
-    type: "kiryana" as ShopType,
+    type: "simple" as ShopMode,
     emoji: "🏪",
-    title: "Kiryana / Chota Dukan",
-    urdu: "کریانہ / چھوٹی دکان",
-    subtitle: "Simple udhar & khata tracking",
-    bestFor: "General stores · Medical stores · Fruit shops · Tea stalls",
+    title: "Simple — Kiryana / Chota Dukan",
+    urdu: "سادہ — کریانہ / چھوٹی دکان",
+    subtitle: "Sirf zaruri cheezein — udhar, khata, customers",
+    bestFor: "General stores · Fruit shops · Tea stalls · Medical stores",
     color: "from-emerald-500 to-teal-600",
     borderActive: "border-emerald-500 ring-2 ring-emerald-500/30",
     features: [
-      { icon: BookOpen, text: "Customer udhar (khata) tracking" },
-      { icon: MessageCircle, text: "WhatsApp balance reminders" },
-      { icon: DollarSign, text: "Quick payment recording" },
-      { icon: Users, text: "Daily closing report" },
+      { icon: BookOpen, text: "Customer udhar (khata)" },
+      { icon: MessageCircle, text: "WhatsApp reminders" },
+      { icon: DollarSign, text: "Credit & payment entry" },
+      { icon: Users, text: "Customer management" },
     ],
+    badge: null,
   },
   {
-    type: "pro" as ShopType,
+    type: "pro" as ShopMode,
     emoji: "🏬",
-    title: "Bara Dukan / Pro",
-    urdu: "بڑی دکان / پرو",
-    subtitle: "Full POS + inventory management",
+    title: "Pro — Bara Dukan",
+    urdu: "پرو — بڑی دکان",
+    subtitle: "Inventory + suppliers + POS + daily close",
     bestFor: "Supermarkets · Pharmacies · Wholesale · Electronics",
     color: "from-blue-500 to-indigo-600",
     borderActive: "border-blue-500 ring-2 ring-blue-500/30",
     features: [
       { icon: Scan, text: "Barcode scanner & POS" },
-      { icon: Store, text: "Product inventory tracking" },
-      { icon: BarChart3, text: "Sales & profit reports" },
-      { icon: BookOpen, text: "Full udhar + khata system" },
+      { icon: Truck, text: "Supplier management" },
+      { icon: ClipboardCheck, text: "Daily closing report" },
+      { icon: ShoppingCart, text: "Full sales & inventory" },
     ],
+    badge: "Most Popular",
+  },
+  {
+    type: "advanced" as ShopMode,
+    emoji: "🏢",
+    title: "Advanced — Enterprise",
+    urdu: "ایڈوانسڈ — بڑا کاروبار",
+    subtitle: "Cheques + reports + full financial tracking",
+    bestFor: "Large stores · Distributors · Multi-product wholesale",
+    color: "from-purple-500 to-violet-600",
+    borderActive: "border-purple-500 ring-2 ring-purple-500/30",
+    features: [
+      { icon: Banknote, text: "Cheque management" },
+      { icon: BarChart3, text: "P&L & sales reports" },
+      { icon: BookOpen, text: "Everything in Pro" },
+      { icon: DollarSign, text: "Full financial overview" },
+    ],
+    badge: "All Features",
   },
 ];
 
 export default function FirstRun({ onComplete }: FirstRunProps) {
-  const [selected, setSelected] = useState<ShopType | null>(null);
+  const [selected, setSelected] = useState<ShopMode | null>(null);
   const [saving, setSaving] = useState(false);
   const { setShopType } = useLanguage();
 
@@ -84,7 +99,6 @@ export default function FirstRun({ onComplete }: FirstRunProps) {
           transition={{ type: "spring", damping: 12 }}
           className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-white/15 flex items-center justify-center backdrop-blur-sm border border-white/20 shadow-xl"
         >
-          {/* Inline logo so no external image needed */}
           <svg viewBox="0 0 100 100" className="w-12 h-12">
             <path
               d="M11,31 Q11,27 15,28 L47,34 L47,77 L15,71 Q11,70 11,66 Z"
@@ -158,13 +172,13 @@ export default function FirstRun({ onComplete }: FirstRunProps) {
       </div>
 
       {/* Selection area */}
-      <div className="flex-1 px-4 py-6 space-y-4 max-w-lg mx-auto w-full">
+      <div className="flex-1 px-4 py-6 space-y-3 max-w-lg mx-auto w-full">
         <div className="text-center mb-2">
           <h2 className="text-lg font-display font-bold text-foreground">
-            Apni dukan ka type chunein
+            Apni dukan ka mode chunein
           </h2>
           <p className="text-sm text-muted-foreground mt-0.5">
-            اپنی دکان کا قسم چنیں — Choose your shop type
+            اپنی دکان کا موڈ چنیں — Settings mein baad mein bhi badal sakte hain
           </p>
         </div>
 
@@ -175,7 +189,7 @@ export default function FirstRun({ onComplete }: FirstRunProps) {
               key={mode.type}
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.25 + i * 0.1 }}
+              transition={{ delay: 0.25 + i * 0.08 }}
               onClick={() => setSelected(mode.type)}
               className={`w-full text-left rounded-2xl border-2 p-4 transition-all duration-200 bg-card shadow-sm ${
                 isSelected
@@ -191,10 +205,19 @@ export default function FirstRun({ onComplete }: FirstRunProps) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <p className="font-display font-bold text-card-foreground text-base leading-tight">
-                        {mode.title}
-                      </p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-display font-bold text-card-foreground text-sm leading-tight">
+                          {mode.title}
+                        </p>
+                        {mode.badge && (
+                          <span
+                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-gradient-to-r ${mode.color} text-white shrink-0`}
+                          >
+                            {mode.badge}
+                          </span>
+                        )}
+                      </div>
                       <p
                         className="text-xs text-muted-foreground"
                         style={{ fontFamily: "serif" }}
@@ -220,7 +243,6 @@ export default function FirstRun({ onComplete }: FirstRunProps) {
                 </div>
               </div>
 
-              {/* Features */}
               <div className="mt-3 grid grid-cols-2 gap-1.5">
                 {mode.features.map((f) => (
                   <div key={f.text} className="flex items-center gap-1.5">
